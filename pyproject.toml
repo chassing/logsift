@@ -1,0 +1,39 @@
+[project]
+name = "logsift"
+version = "0.1.0"
+description = "A CLI/TUI tool for viewing and filtering log lines"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Christian Assing", email = "chris@ca-net.org" }]
+requires-python = ">=3.13"
+dependencies = ["textual>=1.0", "typer>=0.9", "pydantic>=2.0", "aiofiles>=24.0"]
+
+[project.scripts]
+logsift = "logsift.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "textual-dev>=1.0",
+    "ruff>=0.8",
+    "mypy>=1.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
