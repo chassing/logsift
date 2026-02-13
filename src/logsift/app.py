@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from datetime import UTC, datetime
+from typing import Any, ClassVar
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Footer
 
-from logsift.models import FilterRule, FilterType, LogLine
+from logsift.models import ContentType, FilterRule, FilterType, LogLine
+from logsift.session import create_session, load_session, save_session
 from logsift.widgets.filter_bar import FilterBar
 from logsift.widgets.filter_dialog import FilterDialog
+from logsift.widgets.filter_manage_dialog import FilterManageDialog
 from logsift.widgets.help_screen import HelpScreen
 from logsift.widgets.log_view import LogView
+from logsift.widgets.session_dialog import SessionLoadDialog, SessionSaveDialog
 from logsift.widgets.status_bar import StatusBar
 
 
@@ -28,7 +32,10 @@ class LogSiftApp(App[None]):
         Binding("h", "show_help", "Help", show=False),
         Binding("slash", "filter_in", "Filter in"),
         Binding("backslash", "filter_out", "Filter out"),
-        Binding("c", "clear_filters", "Clear filters"),
+        Binding("m", "manage_filters", "Manage filters"),
+        Binding("c", "clear_filters", "Clear"),
+        Binding("s", "save_session", "Save"),
+        Binding("l", "load_session", "Load"),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
         Binding("3", "toggle_filter(3)", "Toggle 3", show=False),
@@ -40,11 +47,17 @@ class LogSiftApp(App[None]):
         Binding("9", "toggle_filter(9)", "Toggle 9", show=False),
     ]
 
-    def __init__(self, lines: list[LogLine] | None = None, source: str = "") -> None:
+    def __init__(
+        self,
+        lines: list[LogLine] | None = None,
+        source: str = "",
+        session_name: str | None = None,
+    ) -> None:
         super().__init__()
         self._lines = lines or []
         self._source = source
         self._filter_rules: list[FilterRule] = []
+        self._session_name = session_name or datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
 
     def compose(self) -> ComposeResult:
         yield FilterBar(id="filter-bar")
@@ -56,6 +69,14 @@ class LogSiftApp(App[None]):
         log_view = self.query_one("#log-view", LogView)
         if self._lines:
             log_view.set_lines(self._lines)
+        if self._session_name:
+            try:
+                session = load_session(self._session_name)
+                self._filter_rules = list(session.filters)
+                self._apply_filters()
+                self.notify(f"Session '{self._session_name}' loaded")
+            except FileNotFoundError:
+                pass
         self._update_status_bar()
 
     def _update_status_bar(self) -> None:
@@ -72,20 +93,54 @@ class LogSiftApp(App[None]):
         log_view.set_filters(self._filter_rules)
         filter_bar.update_filters(self._filter_rules)
         self._update_status_bar()
+        self._autosave_filters()
+
+    def _autosave_filters(self) -> None:
+        """Auto-save current filters under session name."""
+        if not self._filter_rules:
+            return
+        session = create_session(self._session_name, self._filter_rules)
+        save_session(session)
 
     def _add_filter(self, rule: FilterRule) -> None:
         self._filter_rules.append(rule)
         self._apply_filters()
 
+    def _get_current_json_data(self) -> dict[str, Any] | None:
+        """Get JSON data from the current cursor line, if it's a JSON line."""
+        log_view = self.query_one("#log-view", LogView)
+        visible = log_view._lines
+        if not visible:
+            return None
+        line = visible[log_view.cursor_line]
+        if line.content_type == ContentType.JSON and line.parsed_json is not None:
+            return line.parsed_json
+        return None
+
+    # --- Filter actions ---
+
     def action_filter_in(self) -> None:
-        self.push_screen(FilterDialog(FilterType.INCLUDE), callback=self._on_filter_result)
+        json_data = self._get_current_json_data()
+        self.push_screen(FilterDialog(FilterType.INCLUDE, json_data=json_data), callback=self._on_filter_result)
 
     def action_filter_out(self) -> None:
-        self.push_screen(FilterDialog(FilterType.EXCLUDE), callback=self._on_filter_result)
+        json_data = self._get_current_json_data()
+        self.push_screen(FilterDialog(FilterType.EXCLUDE, json_data=json_data), callback=self._on_filter_result)
 
     def _on_filter_result(self, result: FilterRule | None) -> None:
         if result is not None:
             self._add_filter(result)
+
+    def action_manage_filters(self) -> None:
+        if not self._filter_rules:
+            self.notify("No filters to manage", severity="warning")
+            return
+        self.push_screen(FilterManageDialog(self._filter_rules), callback=self._on_manage_result)
+
+    def _on_manage_result(self, result: list[FilterRule] | None) -> None:
+        if result is not None:
+            self._filter_rules = result
+            self._apply_filters()
 
     def action_clear_filters(self) -> None:
         if self._filter_rules:
@@ -97,6 +152,40 @@ class LogSiftApp(App[None]):
         if 0 <= idx < len(self._filter_rules):
             self._filter_rules[idx].enabled = not self._filter_rules[idx].enabled
             self._apply_filters()
+
+    # --- Session actions ---
+
+    def action_save_session(self) -> None:
+        if not self._filter_rules:
+            self.notify("No filters to save", severity="warning")
+            return
+        self.push_screen(SessionSaveDialog(), callback=self._on_save_session)
+
+    def _on_save_session(self, name: str | None) -> None:
+        if name is None:
+            return
+        self._session_name = name
+        session = create_session(name, self._filter_rules)
+        save_session(session)
+        self.notify(f"Session '{name}' saved")
+
+    def action_load_session(self) -> None:
+        self.push_screen(SessionLoadDialog(), callback=self._on_load_session)
+
+    def _on_load_session(self, name: str | None) -> None:
+        if name is None:
+            return
+        try:
+            session = load_session(name)
+        except FileNotFoundError:
+            self.notify(f"Session '{name}' not found", severity="error")
+            return
+        self._session_name = name
+        self._filter_rules = list(session.filters)
+        self._apply_filters()
+        self.notify(f"Session '{name}' loaded")
+
+    # --- Help ---
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())

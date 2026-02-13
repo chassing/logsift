@@ -15,6 +15,7 @@ app = typer.Typer(add_completion=False)
 @app.command()
 def run(
     file: Annotated[Path | None, typer.Argument(help="Log file to view")] = None,
+    session: Annotated[str | None, typer.Option("--session", "-s", help="Load a saved filter session")] = None,
 ) -> None:
     """View and filter log lines in a terminal UI."""
     if file is not None and not file.is_file():
@@ -33,8 +34,8 @@ def run(
 
     from logsift.app import LogSiftApp
 
-    log_app = LogSiftApp(lines=lines, source=source)
-    log_app.run()
+    log_app = LogSiftApp(lines=lines, source=source, session_name=session)
+    log_app.run(mouse=False)
 
 
 def main() -> None:

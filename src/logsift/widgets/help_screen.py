@@ -24,10 +24,18 @@ HELP_TEXT = """\
   n             Toggle line numbers
 
 [bold]Filtering[/bold]
-  /             Filter in: show only matching lines
-  \\             Filter out: hide matching lines
+  /             Filter in (text or key=value)
+  \\             Filter out (text or key=value)
+  m             Manage filters (reorder, toggle, delete)
   c             Clear all filters
   1-9           Toggle individual filter on/off
+
+  On JSON lines, / and \\ show key-value suggestions.
+  Filters auto-save to session '_last'.
+
+[bold]Sessions[/bold]
+  s             Save current filters as session
+  l             Load a saved session
 
 [bold]General[/bold]
   h, ?          Show this help

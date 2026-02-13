@@ -40,3 +40,15 @@ class FilterRule(BaseModel):
     filter_type: FilterType
     pattern: str
     enabled: bool = True
+    is_json_key: bool = False
+    json_key: str | None = None
+    json_value: str | None = None
+
+
+class Session(BaseModel):
+    """A named set of filter rules."""
+
+    name: str
+    filters: list[FilterRule] = []
+    created_at: datetime
+    updated_at: datetime

@@ -1,4 +1,4 @@
-"""Active filter display bar."""
+"""Compact filter status display bar."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widget import Widget
 
-from logsift.models import FilterRule, FilterType
+from logsift.models import FilterRule
 
 
 class FilterBar(Widget):
-    """Horizontal bar showing active filters."""
+    """Compact bar showing filter count summary."""
 
     DEFAULT_CSS = """
     FilterBar {
@@ -18,6 +18,7 @@ class FilterBar(Widget):
         dock: top;
         background: $surface-darken-1;
         display: none;
+        padding: 0 1;
     }
 
     FilterBar.has-filters {
@@ -39,16 +40,26 @@ class FilterBar(Widget):
         if not self.filters:
             return Text()
 
-        text = Text()
-        for i, rule in enumerate(self.filters):
-            prefix = "+" if rule.filter_type == FilterType.INCLUDE else "-"
-            style = "green" if rule.filter_type == FilterType.INCLUDE else "red"
-            if not rule.enabled:
-                style = "dim"
+        total = len(self.filters)
+        active = sum(1 for r in self.filters if r.enabled)
+        includes = sum(1 for r in self.filters if r.enabled and r.filter_type.value == "include")
+        excludes = sum(1 for r in self.filters if r.enabled and r.filter_type.value == "exclude")
 
-            if i > 0:
-                text.append(" ")
-            text.append(f"[{i + 1}] ", style="dim")
-            text.append(f"{prefix}{rule.pattern}", style=style)
+        text = Text()
+        text.append(f" {total} filters", style="bold")
+        if active < total:
+            text.append(f" ({active} active)", style="dim")
+
+        parts = []
+        if includes:
+            parts.append(f"+{includes}")
+        if excludes:
+            parts.append(f"-{excludes}")
+        if parts:
+            text.append(f"  [{', '.join(parts)}]", style="dim")
+
+        text.append("  |  ", style="dim")
+        text.append("m", style="bold")
+        text.append(" Manage filters", style="dim")
 
         return text

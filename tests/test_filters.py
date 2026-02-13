@@ -93,3 +93,78 @@ class TestApplyFilters:
         result = apply_filters(SAMPLE_LINES, rules)
         # Only ERROR include is active
         assert result == [0, 3]
+
+
+JSON_LINES = [
+    LogLine(
+        line_number=1,
+        raw='{"log_level": "info", "msg": "ok"}',
+        content_type=ContentType.JSON,
+        content='{"log_level": "info", "msg": "ok"}',
+        parsed_json={"log_level": "info", "msg": "ok"},
+    ),
+    LogLine(
+        line_number=2,
+        raw='{"log_level": "error", "msg": "fail"}',
+        content_type=ContentType.JSON,
+        content='{"log_level": "error", "msg": "fail"}',
+        parsed_json={"log_level": "error", "msg": "fail"},
+    ),
+    _make_line(3, "plain text no json"),
+]
+
+
+class TestJsonKeyFilters:
+    def test_json_key_include(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="log_level=error",
+                is_json_key=True,
+                json_key="log_level",
+                json_value="error",
+            )
+        ]
+        result = apply_filters(JSON_LINES, rules)
+        assert result == [1]
+
+    def test_json_key_exclude(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.EXCLUDE,
+                pattern="log_level=info",
+                is_json_key=True,
+                json_key="log_level",
+                json_value="info",
+            )
+        ]
+        result = apply_filters(JSON_LINES, rules)
+        assert result == [1, 2]
+
+    def test_json_key_no_match_on_text_line(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="log_level=info",
+                is_json_key=True,
+                json_key="log_level",
+                json_value="info",
+            )
+        ]
+        result = apply_filters(JSON_LINES, rules)
+        # Only JSON line with matching key, not the text line
+        assert result == [0]
+
+    def test_mixed_text_and_json_filters(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="log_level=error",
+                is_json_key=True,
+                json_key="log_level",
+                json_value="error",
+            ),
+            FilterRule(filter_type=FilterType.INCLUDE, pattern="plain"),
+        ]
+        result = apply_filters(JSON_LINES, rules)
+        assert result == [1, 2]

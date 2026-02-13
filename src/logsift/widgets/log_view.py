@@ -63,11 +63,11 @@ class LogView(ScrollView, can_focus=True):
         Binding("pagedown", "page_down", "Page Down", show=False),
         Binding("home", "scroll_home", "Home", show=False),
         Binding("end", "scroll_end", "End", show=False),
-        Binding("g", "goto_top_or_prefix", "gg Top", show=False),
-        Binding("G", "scroll_end", "G  Bottom"),
-        Binding("j", "toggle_json_global", "j  JSON"),
-        Binding("enter", "toggle_json_line", "Enter  Expand", show=False),
-        Binding("n", "toggle_line_numbers", "n  Lines#"),
+        Binding("g", "goto_top_or_prefix", "Top (gg)", show=False),
+        Binding("G", "scroll_end", "Bottom", show=False),
+        Binding("j", "toggle_json_global", "JSON"),
+        Binding("enter", "toggle_json_line", "Expand", show=False),
+        Binding("n", "toggle_line_numbers", "Lines#"),
     ]
 
     cursor_line: reactive[int] = reactive(0)
