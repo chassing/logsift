@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from rich.console import Console
 from rich.highlighter import JSONHighlighter
 from rich.segment import Segment
 from rich.style import Style
@@ -22,15 +21,24 @@ def render_json_expanded(
     lineno_style: Style,
     timestamp_style: Style,
     bg_style: Style,
+    show_line_numbers: bool = True,
 ) -> list[Strip]:
     """Render a JSON log line as pretty-printed, syntax-highlighted strips."""
     if line.parsed_json is None:
-        return [_render_compact_strip(line, lineno_style, timestamp_style, Style(), bg_style)]
+        return [_render_compact_strip(line, lineno_style, timestamp_style, Style(), bg_style, show_line_numbers)]
 
     try:
         formatted = json.dumps(line.parsed_json, indent=2, ensure_ascii=False)
     except (TypeError, ValueError):
-        return [_render_compact_strip(line, lineno_style, timestamp_style, Style(), bg_style)]
+        return [_render_compact_strip(line, lineno_style, timestamp_style, Style(), bg_style, show_line_numbers)]
+
+    # Compute prefix width for continuation line alignment
+    prefix_width = 0
+    if show_line_numbers:
+        prefix_width += 7
+    if line.timestamp is not None:
+        ts_end = len(line.raw) - len(line.content)
+        prefix_width += ts_end
 
     json_lines = formatted.split("\n")
     strips: list[Strip] = []
@@ -39,19 +47,17 @@ def render_json_expanded(
         segments: list[Segment] = []
 
         if i == 0:
-            lineno_text = f"{line.line_number:>6} "
-            segments.append(Segment(lineno_text, lineno_style + bg_style))
+            if show_line_numbers:
+                lineno_text = f"{line.line_number:>6} "
+                segments.append(Segment(lineno_text, lineno_style + bg_style))
             if line.timestamp is not None:
                 ts_end = len(line.raw) - len(line.content)
                 ts_text = line.raw[:ts_end]
                 segments.append(Segment(ts_text, timestamp_style + bg_style))
         else:
-            prefix_width = 7
-            if line.timestamp is not None:
-                ts_end = len(line.raw) - len(line.content)
-                prefix_width += ts_end
             segments.append(Segment(" " * prefix_width, bg_style))
 
+        # Apply JSON syntax highlighting, merging bg_style into every segment
         highlighted = _json_highlighter(Text(json_line))
         for seg in _text_to_segments(highlighted, bg_style):
             segments.append(seg)
@@ -62,17 +68,28 @@ def render_json_expanded(
 
 
 def _text_to_segments(text: Text, bg_style: Style) -> list[Segment]:
-    """Convert a Rich Text object to a list of Segments with background applied."""
-    if not text.highlight_regex(r"."):
-        return [Segment(text.plain, bg_style)]
+    """Convert a Rich Text object to Segments with background applied to all.
 
-    console = Console(width=200, no_color=False)
-    segments: list[Segment] = []
+    Only the background color from bg_style is merged into syntax-highlighted
+    segments, preserving their foreground colors.
+    """
+    from rich.console import Console
+
+    plain = text.plain
+    if not plain:
+        return [Segment("", bg_style)]
+
+    # Extract only background from bg_style to avoid overriding syntax colors
+    bg_only = Style(bgcolor=bg_style.bgcolor) if bg_style.bgcolor else Style()
+
+    console = Console(width=500, no_color=False)
+    result: list[Segment] = []
     for seg in text.render(console):
         if seg.text:
-            combined = (seg.style or Style()) + bg_style if seg.style else bg_style
-            segments.append(Segment(seg.text, combined))
-    return segments
+            combined = (seg.style + bg_only) if seg.style else bg_style
+            result.append(Segment(seg.text, combined))
+
+    return result if result else [Segment(plain, bg_style)]
 
 
 def _render_compact_strip(
@@ -81,11 +98,13 @@ def _render_compact_strip(
     timestamp_style: Style,
     content_style: Style,
     bg_style: Style,
+    show_line_numbers: bool = True,
 ) -> Strip:
     """Render a single compact line as a Strip."""
     segments: list[Segment] = []
-    lineno_text = f"{line.line_number:>6} "
-    segments.append(Segment(lineno_text, lineno_style + bg_style))
+    if show_line_numbers:
+        lineno_text = f"{line.line_number:>6} "
+        segments.append(Segment(lineno_text, lineno_style + bg_style))
     if line.timestamp is not None:
         ts_end = len(line.raw) - len(line.content)
         ts_text = line.raw[:ts_end]

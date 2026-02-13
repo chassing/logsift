@@ -25,3 +25,18 @@ class LogLine(BaseModel):
     content_type: ContentType
     content: str
     parsed_json: dict[str, Any] | None = None
+
+
+class FilterType(StrEnum):
+    """Type of filter rule."""
+
+    INCLUDE = "include"
+    EXCLUDE = "exclude"
+
+
+class FilterRule(BaseModel):
+    """A single filter rule."""
+
+    filter_type: FilterType
+    pattern: str
+    enabled: bool = True

@@ -7,13 +7,14 @@ from typing import Any, ClassVar
 
 from rich.segment import Segment
 from rich.style import Style
-from textual.binding import BindingType
+from textual.binding import Binding, BindingType
 from textual.geometry import Size
 from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
-from logsift.models import ContentType, LogLine
+from logsift.filters import apply_filters
+from logsift.models import ContentType, FilterRule, LogLine
 from logsift.widgets.log_line import get_line_height, render_json_expanded
 
 
@@ -26,8 +27,8 @@ class LogView(ScrollView, can_focus=True):
     }
 
     LogView > .logview--highlight {
-        background: $accent;
-        color: $text;
+        background: #264f78;
+        color: #ffffff;
     }
 
     LogView > .logview--timestamp {
@@ -56,22 +57,29 @@ class LogView(ScrollView, can_focus=True):
     }
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        ("up", "cursor_up", "Up"),
-        ("down", "cursor_down", "Down"),
-        ("pageup", "page_up", "Page Up"),
-        ("pagedown", "page_down", "Page Down"),
-        ("home", "scroll_home", "Home"),
-        ("end", "scroll_end", "End"),
-        ("j", "toggle_json_global", "Toggle JSON"),
-        ("enter", "toggle_json_line", "Toggle line"),
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
+        Binding("home", "scroll_home", "Home", show=False),
+        Binding("end", "scroll_end", "End", show=False),
+        Binding("g", "goto_top_or_prefix", "gg Top", show=False),
+        Binding("G", "scroll_end", "G  Bottom"),
+        Binding("j", "toggle_json_global", "j  JSON"),
+        Binding("enter", "toggle_json_line", "Enter  Expand", show=False),
+        Binding("n", "toggle_line_numbers", "n  Lines#"),
     ]
 
     cursor_line: reactive[int] = reactive(0)
 
     def __init__(self, lines: list[LogLine] | None = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._lines: list[LogLine] = lines or []
+        self._all_lines: list[LogLine] = lines or []
+        self._g_pending: bool = False
+        self._filtered_indices: list[int] = []
+        self._filter_rules: list[FilterRule] = []
         self._max_width: int = 0
+        self._show_line_numbers: bool = True
         # JSON expansion state
         self._global_expand: bool = False
         self._line_expand: set[int] = set()
@@ -80,21 +88,61 @@ class LogView(ScrollView, can_focus=True):
         self._heights: list[int] = []
         self._offsets: list[int] = []
 
+    @property
+    def _lines(self) -> list[LogLine]:
+        """Get the currently visible lines (filtered or all)."""
+        if self._filtered_indices is not None and self._filter_rules:
+            return [self._all_lines[i] for i in self._filtered_indices]
+        return self._all_lines
+
+    @property
+    def total_count(self) -> int:
+        return len(self._all_lines)
+
+    @property
+    def filtered_count(self) -> int:
+        return len(self._lines)
+
+    @property
+    def has_filters(self) -> bool:
+        return bool(self._filter_rules)
+
     def on_mount(self) -> None:
-        self._recompute_heights()
+        self._apply_filters()
 
     def set_lines(self, lines: list[LogLine]) -> None:
         """Replace all log lines and refresh display."""
-        self._lines = lines
+        self._all_lines = lines
         self._global_expand = False
         self._line_expand.clear()
         self._sticky_expand = False
+        self._filter_rules.clear()
         self.cursor_line = 0
-        self._recompute_heights()
+        self._apply_filters()
+
+    def set_filters(self, rules: list[FilterRule]) -> None:
+        """Apply filter rules and refresh display."""
+        self._filter_rules = list(rules)
+        old_cursor = self.cursor_line
+        self._apply_filters()
+        # Keep cursor in bounds
+        visible = self._lines
+        if visible:
+            self.cursor_line = min(old_cursor, len(visible) - 1)
+        else:
+            self.cursor_line = 0
         self.refresh()
 
+    def _apply_filters(self) -> None:
+        """Recompute filtered indices and update display."""
+        if self._filter_rules:
+            self._filtered_indices = apply_filters(self._all_lines, self._filter_rules)
+        else:
+            self._filtered_indices = list(range(len(self._all_lines)))
+        self._recompute_heights()
+
     def _is_expanded(self, line_index: int) -> bool:
-        """Check if a line should be rendered expanded."""
+        """Check if a visible line index should be rendered expanded."""
         if self._global_expand:
             return True
         if line_index in self._line_expand:
@@ -103,25 +151,25 @@ class LogView(ScrollView, can_focus=True):
 
     def _recompute_heights(self) -> None:
         """Recompute line heights and prefix-sum offsets."""
+        visible = self._lines
         self._heights = []
         self._offsets = []
         offset = 0
-        for i, line in enumerate(self._lines):
+        for i, line in enumerate(visible):
             expanded = self._is_expanded(i)
             h = get_line_height(line, expanded)
             self._heights.append(h)
             self._offsets.append(offset)
             offset += h
 
-        if self._lines:
-            self._max_width = max(len(line.raw) for line in self._lines)
+        if visible:
+            self._max_width = max(len(line.raw) for line in visible)
         else:
             self._max_width = 0
-        total_height = offset
-        self.virtual_size = Size(self._max_width + 10, total_height)
+        self.virtual_size = Size(self._max_width + 10, offset)
 
     def _display_row_to_line(self, display_row: int) -> tuple[int, int]:
-        """Map a display row to (line_index, sub_row) using binary search on offsets."""
+        """Map a display row to (line_index, sub_row) using binary search."""
         if not self._offsets:
             return 0, 0
         idx = bisect.bisect_right(self._offsets, display_row) - 1
@@ -146,7 +194,8 @@ class LogView(ScrollView, can_focus=True):
             return Strip.blank(content_width, self.rich_style)
 
         line_index, sub_row = self._display_row_to_line(display_row)
-        line = self._lines[line_index]
+        visible = self._lines
+        line = visible[line_index]
         is_highlighted = line_index == self.cursor_line
         expanded = self._is_expanded(line_index)
 
@@ -158,15 +207,21 @@ class LogView(ScrollView, can_focus=True):
         bg_style = highlight_style if is_highlighted else Style()
 
         if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
-            strips = render_json_expanded(line, content_width, lineno_style, timestamp_style, bg_style)
+            strips = render_json_expanded(
+                line, content_width, lineno_style, timestamp_style, bg_style, self._show_line_numbers
+            )
             strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
         else:
             segments = self._render_compact_line(line, lineno_style, timestamp_style, json_style, text_style, bg_style)
             strip = Strip(segments)
 
         strip = strip.crop(scroll_x, scroll_x + content_width)
-        strip = strip.extend_cell_length(content_width)
-        strip = strip.apply_style(self.rich_style)
+        if is_highlighted:
+            fill_style = Style(bgcolor=highlight_style.bgcolor)
+            strip = strip.extend_cell_length(content_width, fill_style)
+        else:
+            strip = strip.extend_cell_length(content_width)
+            strip = strip.apply_style(self.rich_style)
 
         return strip
 
@@ -182,8 +237,9 @@ class LogView(ScrollView, can_focus=True):
         """Render a single compact log line."""
         segments: list[Segment] = []
 
-        lineno_text = f"{line.line_number:>6} "
-        segments.append(Segment(lineno_text, lineno_style + bg_style))
+        if self._show_line_numbers:
+            lineno_text = f"{line.line_number:>6} "
+            segments.append(Segment(lineno_text, lineno_style + bg_style))
 
         if line.timestamp is not None:
             ts_end = len(line.raw) - len(line.content)
@@ -207,14 +263,16 @@ class LogView(ScrollView, can_focus=True):
 
     def _scroll_cursor_into_view(self) -> None:
         """Ensure the cursor line is visible."""
-        if not self._lines or not self._offsets:
+        visible = self._lines
+        if not visible or not self._offsets:
             return
         region_height = self.scrollable_content_region.height
         if region_height <= 0:
             return
 
-        cursor_start = self._offsets[self.cursor_line]
-        cursor_height = self._heights[self.cursor_line]
+        cursor = min(self.cursor_line, len(visible) - 1)
+        cursor_start = self._offsets[cursor]
+        cursor_height = self._heights[cursor]
         scroll_y = self.scroll_offset.y
 
         if cursor_start < scroll_y:
@@ -234,7 +292,6 @@ class LogView(ScrollView, can_focus=True):
 
     def action_page_up(self) -> None:
         page_size = max(1, self.scrollable_content_region.height - 1)
-        # Find the line that is page_size display rows above
         if not self._offsets:
             return
         target_row = max(0, self._offsets[self.cursor_line] - page_size)
@@ -267,9 +324,10 @@ class LogView(ScrollView, can_focus=True):
 
     def action_toggle_json_line(self) -> None:
         """Toggle JSON pretty-print for the current line."""
-        if not self._lines:
+        visible = self._lines
+        if not visible:
             return
-        line = self._lines[self.cursor_line]
+        line = visible[self.cursor_line]
         if line.content_type != ContentType.JSON or line.parsed_json is None:
             return
 
@@ -281,3 +339,20 @@ class LogView(ScrollView, can_focus=True):
         self._recompute_heights()
         self._scroll_cursor_into_view()
         self.refresh()
+
+    def action_toggle_line_numbers(self) -> None:
+        """Toggle line number display."""
+        self._show_line_numbers = not self._show_line_numbers
+        self.refresh()
+
+    def action_goto_top_or_prefix(self) -> None:
+        """Handle 'g' key: second 'g' goes to top (gg)."""
+        if self._g_pending:
+            self._g_pending = False
+            self.cursor_line = 0
+        else:
+            self._g_pending = True
+            self.set_timer(0.5, self._clear_g_pending)
+
+    def _clear_g_pending(self) -> None:
+        self._g_pending = False

@@ -23,15 +23,17 @@ def run(
 
     if file is not None:
         lines = read_file(file)
+        source = str(file)
     elif is_pipe():
         lines = read_stdin()
+        source = "stdin"
     else:
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
 
     from logsift.app import LogSiftApp
 
-    log_app = LogSiftApp(lines=lines)
+    log_app = LogSiftApp(lines=lines, source=source)
     log_app.run()
 
 
