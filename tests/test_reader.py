@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from logsift.models import ContentType
-from logsift.reader import read_file
+from logsift.reader import is_pipe, read_file, read_stdin
 
 
 class TestReadFile:
@@ -36,3 +38,30 @@ class TestReadFile:
         assert len(lines) == 1
         assert lines[0].content == "hello world"
         assert lines[0].timestamp is not None
+
+
+class TestReadStdin:
+    def test_read_stdin(self) -> None:
+        fake_input = '2024-01-15T10:30:00Z {"key": "value"}\nplain text line\n'
+        with patch("logsift.reader.sys.stdin", StringIO(fake_input)):
+            lines = read_stdin()
+        assert len(lines) == 2
+        assert lines[0].content_type == ContentType.JSON
+        assert lines[1].content_type == ContentType.TEXT
+
+    def test_read_stdin_empty(self) -> None:
+        with patch("logsift.reader.sys.stdin", StringIO("")):
+            lines = read_stdin()
+        assert len(lines) == 0
+
+
+class TestIsPipe:
+    def test_is_pipe_true(self) -> None:
+        with patch("logsift.reader.sys.stdin") as mock_stdin:
+            mock_stdin.isatty.return_value = False
+            assert is_pipe() is True
+
+    def test_is_pipe_false(self) -> None:
+        with patch("logsift.reader.sys.stdin") as mock_stdin:
+            mock_stdin.isatty.return_value = True
+            assert is_pipe() is False

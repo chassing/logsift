@@ -7,6 +7,8 @@ from typing import Annotated
 
 import typer
 
+from logsift.reader import is_pipe, read_file, read_stdin
+
 app = typer.Typer(add_completion=False)
 
 
@@ -19,9 +21,17 @@ def run(
         typer.echo(f"Error: {file} is not a file")
         raise typer.Exit(1)
 
+    if file is not None:
+        lines = read_file(file)
+    elif is_pipe():
+        lines = read_stdin()
+    else:
+        typer.echo("Error: provide a file or pipe input")
+        raise typer.Exit(1)
+
     from logsift.app import LogSiftApp
 
-    log_app = LogSiftApp(file=file)
+    log_app = LogSiftApp(lines=lines)
     log_app.run()
 
 
