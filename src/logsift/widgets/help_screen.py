@@ -18,7 +18,7 @@ HELP_TEXT = """\
   gg            Jump to first line
   G             Jump to last line
 
-[bold]JSON Display[/bold]
+[bold]Display[/bold]
   j             Toggle pretty-print for ALL JSON lines
   Enter         Toggle pretty-print for current line (sticky)
   n             Toggle line numbers
@@ -31,11 +31,18 @@ HELP_TEXT = """\
   1-9           Toggle individual filter on/off
 
   On JSON lines, / and \\ show key-value suggestions.
-  Filters auto-save to session '_last'.
+  Filters are auto-saved as sessions.
+
+[bold]Tailing (--tail / -t)[/bold]
+  p             Pause/resume tailing
+  G             Jump to bottom (follow new lines)
+
+  Pipe input is always tailed automatically.
 
 [bold]Sessions[/bold]
-  s             Save current filters as session
+  s             Save current filters as named session
   l             Load a saved session
+  --session/-s  Load session on startup (CLI)
 
 [bold]General[/bold]
   h, ?          Show this help

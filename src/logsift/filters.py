@@ -33,6 +33,20 @@ def apply_filters(lines: list[LogLine], rules: list[FilterRule]) -> list[int]:
     return result
 
 
+def check_line(line: LogLine, rules: list[FilterRule]) -> bool:
+    """Check if a single line passes the current filter rules."""
+    active_includes = [r for r in rules if r.enabled and r.filter_type == FilterType.INCLUDE]
+    active_excludes = [r for r in rules if r.enabled and r.filter_type == FilterType.EXCLUDE]
+
+    if not active_includes and not active_excludes:
+        return True
+
+    if active_includes and not any(_matches(line, r) for r in active_includes):
+        return False
+
+    return not any(_matches(line, r) for r in active_excludes)
+
+
 def _matches(line: LogLine, rule: FilterRule) -> bool:
     """Check if a line matches a filter rule."""
     if rule.is_json_key:

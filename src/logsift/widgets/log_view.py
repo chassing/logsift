@@ -13,7 +13,7 @@ from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
-from logsift.filters import apply_filters
+from logsift.filters import apply_filters, check_line
 from logsift.models import ContentType, FilterRule, LogLine
 from logsift.widgets.log_line import get_line_height, render_json_expanded
 
@@ -132,6 +132,49 @@ class LogView(ScrollView, can_focus=True):
         else:
             self.cursor_line = 0
         self.refresh()
+
+    def append_line(self, line: LogLine) -> None:
+        """Append a single line (for tailing). Auto-scrolls only if cursor was on last line."""
+        visible_before = len(self._lines)
+        cursor_was_on_last = self.cursor_line >= visible_before - 1
+
+        idx = len(self._all_lines)
+        self._all_lines.append(line)
+
+        # Incremental filter check
+        if self._filter_rules:
+            if check_line(line, self._filter_rules):
+                self._filtered_indices.append(idx)
+            else:
+                return  # Line filtered out, no display update needed
+        else:
+            self._filtered_indices.append(idx)
+
+        # Update heights for the new visible line
+        visible_idx = len(self._lines) - 1
+        expanded = self._is_expanded(visible_idx)
+        h = get_line_height(line, expanded)
+        self._heights.append(h)
+        offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
+        self._offsets.append(offset)
+
+        self._max_width = max(self._max_width, len(line.raw))
+        total_height = self._offsets[-1] + self._heights[-1] if self._offsets else 0
+        self.virtual_size = Size(self._max_width + 10, total_height)
+
+        if cursor_was_on_last:
+            self.cursor_line = len(self._lines) - 1
+            self._scroll_cursor_into_view()
+
+        self.refresh()
+
+    def _is_at_bottom(self) -> bool:
+        """Check if the view is scrolled to the bottom."""
+        if not self._offsets:
+            return True
+        total_height = self._offsets[-1] + self._heights[-1]
+        region_height = self.scrollable_content_region.height
+        return self.scroll_offset.y + region_height >= total_height - 1
 
     def _apply_filters(self) -> None:
         """Recompute filtered indices and update display."""

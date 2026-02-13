@@ -29,6 +29,7 @@ dev = [
     "textual-dev>=1.0",
     "ruff>=0.8",
     "mypy>=1.0",
+    "types-aiofiles>=25.1.0.20251011",
 ]
 
 [tool.ruff]

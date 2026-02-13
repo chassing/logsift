@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, ClassVar
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Footer
+from textual.worker import get_current_worker
 
 from logsift.models import ContentType, FilterRule, FilterType, LogLine
+from logsift.reader import read_file_async, read_stdin_async
 from logsift.session import create_session, load_session, save_session
 from logsift.widgets.filter_bar import FilterBar
 from logsift.widgets.filter_dialog import FilterDialog
@@ -34,6 +38,7 @@ class LogSiftApp(App[None]):
         Binding("backslash", "filter_out", "Filter out"),
         Binding("m", "manage_filters", "Manage filters"),
         Binding("c", "clear_filters", "Clear"),
+        Binding("p", "toggle_tail_pause", "Pause"),
         Binding("s", "save_session", "Save"),
         Binding("l", "load_session", "Load"),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
@@ -52,12 +57,20 @@ class LogSiftApp(App[None]):
         lines: list[LogLine] | None = None,
         source: str = "",
         session_name: str | None = None,
+        file_path: Path | None = None,
+        tail: bool = False,
+        pipe_input: bool = False,
     ) -> None:
         super().__init__()
         self._lines = lines or []
         self._source = source
         self._filter_rules: list[FilterRule] = []
         self._session_name = session_name or datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
+        self._file_path = file_path
+        self._tail = tail
+        self._pipe_input = pipe_input
+        self._tail_paused: bool = False
+        self._tail_buffer: list[LogLine] = []
 
     def compose(self) -> ComposeResult:
         yield FilterBar(id="filter-bar")
@@ -67,8 +80,11 @@ class LogSiftApp(App[None]):
 
     def on_mount(self) -> None:
         log_view = self.query_one("#log-view", LogView)
+        status_bar = self.query_one("#status-bar", StatusBar)
+
         if self._lines:
             log_view.set_lines(self._lines)
+
         if self._session_name:
             try:
                 session = load_session(self._session_name)
@@ -77,7 +93,61 @@ class LogSiftApp(App[None]):
                 self.notify(f"Session '{self._session_name}' loaded")
             except FileNotFoundError:
                 pass
+
+        # Start tailing if requested
+        if self._tail and self._file_path:
+            status_bar.set_tailing(True)
+            self._start_tail_file(self._file_path)
+        elif self._pipe_input:
+            status_bar.set_tailing(True)
+            self._start_tail_stdin()
+
         self._update_status_bar()
+
+    def _start_tail_file(self, path: Path) -> None:
+        """Start async file tailing worker."""
+        self.run_worker(self._tail_worker(read_file_async(path, tail=True)), exclusive=True)
+
+    def _start_tail_stdin(self) -> None:
+        """Start async stdin tailing worker."""
+        self.run_worker(self._tail_worker(read_stdin_async()), exclusive=True)
+
+    async def _tail_worker(self, reader: AsyncIterator[LogLine]) -> None:
+        """Consume async line reader and append lines to the view."""
+
+        log_view = self.query_one("#log-view", LogView)
+        worker = get_current_worker()
+        async for line in reader:
+            if worker.is_cancelled:
+                break
+            if self._tail_paused:
+                self._tail_buffer.append(line)
+                status_bar = self.query_one("#status-bar", StatusBar)
+                status_bar.set_new_lines(len(self._tail_buffer))
+            else:
+                log_view.append_line(line)
+                self._update_status_bar()
+
+    def action_toggle_tail_pause(self) -> None:
+        """Toggle tail pause/resume."""
+        if not self._tail and not self._pipe_input:
+            return
+        self._tail_paused = not self._tail_paused
+        status_bar = self.query_one("#status-bar", StatusBar)
+
+        if self._tail_paused:
+            status_bar.set_tailing(False)
+            self.notify("Tailing paused")
+        else:
+            # Flush buffered lines
+            log_view = self.query_one("#log-view", LogView)
+            for line in self._tail_buffer:
+                log_view.append_line(line)
+            self._tail_buffer.clear()
+            status_bar.set_tailing(True)
+            status_bar.set_new_lines(0)
+            self._update_status_bar()
+            self.notify("Tailing resumed")
 
     def _update_status_bar(self) -> None:
         log_view = self.query_one("#log-view", LogView)
@@ -189,3 +259,9 @@ class LogSiftApp(App[None]):
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Hide pause binding when not tailing."""
+        if action == "toggle_tail_pause":
+            return True if (self._tail or self._pipe_input) else None
+        return True
