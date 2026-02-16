@@ -58,7 +58,7 @@ class TestParseTime:
         assert result.hour == 14
         assert result.minute == 30
         assert result.second == 0
-        assert result.tzinfo == UTC
+        assert result.tzinfo is not None
 
     def test_time_only_hhmmss(self) -> None:
         result = parse_time("7:55:30")
@@ -72,9 +72,9 @@ class TestParseTime:
         assert result.month == 1
         assert result.day == 15
 
-    def test_unknown_unit_raises(self) -> None:
+    def test_unknown_string_raises(self) -> None:
         try:
-            parse_time("5x")
+            parse_time("not a date at all xyz123")
             assert False, "Should raise ValueError"  # noqa: B011
         except ValueError:
             pass

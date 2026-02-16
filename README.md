@@ -16,22 +16,20 @@
 
 # logdelve
 
-A terminal UI tool for viewing and filtering log lines. Think of it as a lightweight, interactive log viewer with JSON awareness.
+A terminal UI tool for viewing, filtering, and analyzing log lines. Built for outage investigation — find the needle in the haystack across thousands of log lines from multi-component applications.
 
 ## Features
 
-- **File and pipe input**: Read logs from files or pipe them via stdin
-- **Timestamp parsing**: Automatic detection of ISO 8601, syslog, Apache, and other common timestamp formats
-- **JSON awareness**: Detects JSON content in log lines and offers pretty-printing with syntax highlighting
-- **Pretty-print toggle**: Switch between compact and expanded JSON view, globally or per-line
-- **Log level detection**: Automatic extraction from JSON fields and text patterns, color-coded backgrounds
+- **Log level detection**: Automatic extraction from JSON fields and text patterns, color-coded line backgrounds
 - **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
+- **Anomaly detection**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
 - **Message analysis**: Group log messages by event pattern, analyze JSON field value distributions
-- **Search**: Forward and backward search with regex and case-sensitive options, match highlighting
+- **Search**: Forward/backward search with regex, case-sensitive options, and match highlighting
 - **Interactive filtering**: Filter by text, regex, JSON key-value, or log level
-- **Filter management**: Reorder, toggle, edit, delete, suspend/resume all filters
+- **Filter management**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
 - **Session management**: Save, load, rename, delete filter sessions with auto-save
 - **Live tailing**: Follow growing log files in real-time with pause/resume
+- **Flexible time parsing**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
 - **Theme support**: Choose from all built-in Textual themes with persistent preference
 - **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events with stream names
 
@@ -50,52 +48,76 @@ pip install logdelve
 pip install logdelve[aws]
 ```
 
-## Commands
-
-### `logdelve inspect` - View log files
+## Quick Start
 
 ```bash
-# View a log file (auto-tails by default)
+# View a log file
 logdelve inspect app.log
 
-# Pipe logs from another command
-kubectl logs pod-name | logdelve inspect
+# Pipe logs from kubectl
+kubectl logs deploy/my-app --since=1h | logdelve inspect
 
-# Disable automatic tailing
-logdelve inspect --no-tail app.log
+# Download and view CloudWatch logs
+logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
 
-# Load a saved filter session
-logdelve inspect --session my-filters app.log
+# Compare against a known-good baseline
+logdelve inspect --baseline yesterday.log today.log
 ```
 
-### `logdelve cloudwatch` - AWS CloudWatch logs
+## Use Cases
 
-Requires `logdelve[aws]` (boto3).
+### Outage Investigation with CloudWatch
 
 ```bash
-# List log groups
-logdelve cloudwatch groups
-logdelve cloudwatch groups /aws/lambda/
+# 1. Download baseline (yesterday, everything was fine)
+logdelve cloudwatch get /aws/ecs/my-service "" \
+  -s "yesterday 6:00" -e "yesterday 8:00" > baseline.log
 
-# List streams for a log group
-logdelve cloudwatch streams /aws/lambda/my-function
+# 2. Download current logs (outage happening now)
+logdelve cloudwatch get /aws/ecs/my-service "" -s 1h > current.log
 
-# Download recent logs (last 5 minutes by default)
-logdelve cloudwatch get /aws/lambda/my-function stream-prefix
+# 3. Compare — automatically shows only anomalous lines
+logdelve inspect --baseline baseline.log current.log
 
-# Download with time range
-logdelve cloudwatch get /aws/lambda/my-function prefix -s 1h -e 30m
-
-# Download and view in TUI
-logdelve cloudwatch get /aws/lambda/my-function prefix | logdelve inspect
-
-# Tail CloudWatch logs live
-logdelve cloudwatch get /aws/lambda/my-function prefix --tail | logdelve inspect
+# 4. In the TUI:
+#    - Anomaly filter is auto-enabled (! to toggle off)
+#    - Press 'a' to analyze message groups
+#    - Press 'e' to filter by ERROR level
+#    - Press 'x' to suspend all filters and see context around a line
 ```
 
-Time formats for `--start`/`--end`: `5m`, `1h`, `2d`, `1week`, `14:30`, or ISO 8601. All times in UTC.
+### CloudWatch Log Download
 
-AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or standard environment variables.
+```bash
+# Flexible time formats
+logdelve cloudwatch get /aws/ecs/my-service prefix -s "2 days ago"
+logdelve cloudwatch get /aws/ecs/my-service prefix -s "friday" -e "saturday"
+logdelve cloudwatch get /aws/ecs/my-service prefix -s "yesterday at 8am"
+logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h          # shorthand
+logdelve cloudwatch get /aws/ecs/my-service prefix -s "Feb 13 2026 7:58"
+
+# List available log groups and streams
+logdelve cloudwatch groups /aws/ecs/
+logdelve cloudwatch streams /aws/ecs/my-service
+
+# Live tail CloudWatch logs
+logdelve cloudwatch get /aws/ecs/my-service prefix --tail | logdelve inspect
+
+# Each line includes [stream-name] prefix for component detection
+```
+
+### Analyzing Multi-Component Logs
+
+```bash
+# Pipe mixed logs from multiple pods
+kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
+
+# In the TUI:
+#    - Component tags (·1, ·2) identify pods — press 'c' to see full names
+#    - Press 'e' to filter by log level (ERROR → WARN → INFO)
+#    - Press 'a' then 'm' to switch to field analysis mode
+#    - Select a field value to filter (e.g., http_status: 500)
+```
 
 ## Keybindings
 
@@ -120,31 +142,32 @@ AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or 
 
 ### Display
 
-| Key | Action                                            |
-| --- | ------------------------------------------------- |
-| j   | Toggle pretty-print for ALL JSON lines            |
+| Key   | Action                                            |
+| ----- | ------------------------------------------------- |
+| j     | Toggle pretty-print for ALL JSON lines            |
 | Enter | Toggle pretty-print for the current line (sticky) |
-| #   | Toggle line numbers                               |
-| c   | Cycle component display (tag → full → off)        |
+| #     | Toggle line numbers                               |
+| c     | Cycle component display (tag / full / off)        |
 
 ### Filtering
 
-| Key | Action                                                   |
-| --- | -------------------------------------------------------- |
-| f   | Filter in (text, key=value, or regex)                    |
-| F   | Filter out (text, key=value, or regex)                   |
-| e   | Cycle log level filter (ALL → ERROR → WARN → INFO)      |
-| m   | Manage filters (toggle, edit, delete, clear, reorder)    |
-| x   | Suspend/resume all filters                               |
-| 1-9 | Toggle individual filters on/off                         |
+| Key | Action                                                |
+| --- | ----------------------------------------------------- |
+| f   | Filter in (text, key=value, or regex)                 |
+| F   | Filter out (text, key=value, or regex)                |
+| e   | Cycle log level filter (ALL / ERROR / WARN / INFO)    |
+| !   | Toggle anomaly-only filter (with --baseline)          |
+| x   | Suspend/resume all filters (preserves cursor position)|
+| m   | Manage filters (toggle, edit, delete, clear, reorder) |
+| 1-9 | Toggle individual filters on/off                      |
 
 ### Analysis
 
-| Key | Action                                                   |
-| --- | -------------------------------------------------------- |
-| a   | Analyze: message groups and field value distributions    |
+| Key | Action                                                |
+| --- | ----------------------------------------------------- |
+| a   | Analyze: message groups and field value distributions |
 
-On JSON lines, `f` and `F` show key-value suggestions.
+In the analyze dialog: `m` mode (messages/fields), `s` sort, `r` reverse, Enter to filter.
 
 ### Tailing
 
@@ -153,19 +176,27 @@ On JSON lines, `f` and `F` show key-value suggestions.
 | p   | Pause/resume tailing              |
 | G   | Jump to bottom (follow new lines) |
 
-### Sessions
+### Sessions & General
 
 | Key | Action                                       |
 | --- | -------------------------------------------- |
 | s   | Session manager (load, save, delete, rename) |
+| t   | Select theme                                 |
+| h   | Show help screen                             |
+| q   | Quit                                         |
 
-### General
+## Anomaly Detection
 
-| Key | Action                  |
-| --- | ----------------------- |
-| t   | Select theme            |
-| h   | Show help screen        |
-| q   | Quit                    |
+Compare current logs against a known-good baseline to find what changed:
+
+```bash
+logdelve inspect --baseline good-day.log bad-day.log
+```
+
+- Lines with **new message patterns** (not seen in baseline) are marked with a red `▌` indicator
+- Anomaly filter is auto-enabled — press `!` to toggle between anomalies-only and all lines
+- Press `x` to temporarily suspend all filters and see context around an anomalous line
+- Use `a` (analyze) to see which message patterns are new
 
 ## Log Format
 
@@ -175,9 +206,10 @@ logdelve expects each line to begin with a timestamp, followed by either a JSON 
 2024-01-15T10:30:00Z {"log_level": "info", "message": "Request processed", "duration_ms": 42}
 2024-01-15T10:30:01Z Connection established from 192.168.1.1
 Jan 15 10:30:02 myhost syslogd: restart
+[pod-name-abc123] 2024-01-15T10:30:00Z {"event": "start", "level": "info"}
 ```
 
-Lines without a recognized timestamp are displayed as-is.
+Lines without a recognized timestamp are displayed as-is. Component prefixes (`[pod-name]`, `service |`) are stripped before timestamp parsing.
 
 ## Sessions
 

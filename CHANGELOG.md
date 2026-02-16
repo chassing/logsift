@@ -6,26 +6,30 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Log level detection**: automatic extraction from JSON fields (`log_level`, `level`, `severity`) and text patterns (`[ERROR]`, `ERROR `, `level=error`)
-- **Log level display**: color-coded line backgrounds (red for errors, yellow for warnings) with single-char badge (E, W, I, D, F, T)
+- **Anomaly detection**: `--baseline` option compares current logs against a known-good baseline
+- **Anomaly display**: red `▌` marker on anomalous lines, auto-enabled anomaly filter, `!` to toggle
+- **Log level detection**: automatic extraction from JSON fields and text patterns, color-coded line backgrounds
 - **Log level filter**: `e` to cycle minimum level (ALL → ERROR → WARN → INFO)
-- **Level counts**: status bar shows F:n E:n W:n counts
-- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields (`service`, `component`, `app`)
-- **Component display**: color-coded tags with `c` to cycle (tag → full → off)
-- **Compact timestamp**: HH:MM:SS instead of full ISO
+- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags (`c` to cycle)
 - **Message analysis dialog**: `a` to open, groups log messages by event pattern
-- **Field analysis**: switch to fields mode (`m`) to see JSON field value distributions
-- **Integer field grouping**: =0 vs >0 buckets for numeric fields
-- **Analyze sort/order**: `s` to cycle sort, `r` to reverse order
+- **Field analysis**: `m` to switch mode, JSON field value distributions with =0/>0 buckets for integers
+- **Analyze controls**: separate mode (`m`), sort (`s`), reverse (`r`) controls
 - **Filter edit**: `e` in filter manager to edit a filter's pattern inline
-- **Filter suspend/resume**: `x` to suspend all filters, `x` again to restore
+- **Filter suspend/resume**: `x` suspends ALL filters (rules, level, anomaly), `x` again restores
+- **Cursor preservation**: filter toggles (`x`, `!`, `e`) keep cursor on the same log line, centered on screen
+- **Search persistence**: search dialog pre-fills with last search (pattern, case-sensitive, regex)
+- **Toolbar bar**: always-visible top bar with shortcuts, active search text, level/anomaly/filter status
 - **CloudWatch stream names**: `[stream-name]` prefix in cloudwatch get output
+- **Flexible time parsing**: `dateparser` integration for natural language dates ("yesterday at 8am", "friday", "2 days ago", "Feb 13 2026 7:58")
+- **Compact timestamp**: HH:MM:SS instead of full ISO in log view
 
 ### Changed
 
 - **CloudWatch output**: includes stream name as `[stream-name]` prefix for component detection
 - **Parser**: strips component prefix before timestamp extraction
+- **Filter bar**: always visible toolbar replaces hidden filter-only bar
 - **Filter manager**: shows case-sensitive indicator `[Aa]`
+- **README**: rewritten with use cases, outage investigation workflow, CloudWatch examples
 
 ## [0.2.0] - 2026-02-16
 
