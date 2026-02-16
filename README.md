@@ -8,11 +8,11 @@ A terminal UI tool for viewing and filtering log lines. Think of it as a lightwe
 - **Timestamp parsing**: Automatic detection of ISO 8601, syslog, Apache, and other common timestamp formats
 - **JSON awareness**: Detects JSON content in log lines and offers pretty-printing with syntax highlighting
 - **Pretty-print toggle**: Switch between compact and expanded JSON view, globally or per-line
-- **Interactive filtering**: Filter log lines by text pattern (include or exclude)
-- **JSON key filtering**: Filter by specific JSON key-value pairs (e.g., show only `"log_level": "error"`)
-- **Mouse selection filtering**: Select text with the mouse to create filters
-- **Named sessions**: Save and load filter configurations by name
-- **Live tailing**: Follow growing log files in real-time (like `tail -f`)
+- **Interactive filtering**: Filter log lines by text pattern or JSON key-value pairs (include or exclude)
+- **Filter management**: Reorder, toggle, delete filters with a dedicated dialog
+- **Named sessions**: Save and load filter configurations by name, with auto-save
+- **Live tailing**: Follow growing log files in real-time with pause/resume
+- **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events
 
 ## Installation
 
@@ -24,67 +24,110 @@ uv tool install logsift
 
 # Or install with pip
 pip install logsift
+
+# With AWS CloudWatch support
+pip install logsift[aws]
 ```
 
-## Usage
+## Commands
+
+### `logsift inspect` - View log files
 
 ```bash
-# View a log file
-logsift app.log
+# View a log file (auto-tails by default)
+logsift inspect app.log
 
 # Pipe logs from another command
-kubectl logs pod-name | logsift
+kubectl logs pod-name | logsift inspect
 
-# Follow a growing file (tail mode)
-logsift -f /var/log/syslog
+# Disable automatic tailing
+logsift inspect --no-tail app.log
 
 # Load a saved filter session
-logsift --session my-filters app.log
+logsift inspect --session my-filters app.log
 ```
+
+### `logsift cloudwatch` - AWS CloudWatch logs
+
+Requires `logsift[aws]` (boto3).
+
+```bash
+# List log groups
+logsift cloudwatch groups
+logsift cloudwatch groups -p /aws/lambda/
+
+# List streams for a log group
+logsift cloudwatch streams /aws/lambda/my-function
+
+# Download recent logs (last 5 minutes by default)
+logsift cloudwatch get /aws/lambda/my-function stream-prefix
+
+# Download with time range
+logsift cloudwatch get /aws/lambda/my-function prefix -s 1h -e 30m
+
+# Download and view in TUI
+logsift cloudwatch get /aws/lambda/my-function prefix | logsift inspect
+
+# Tail CloudWatch logs live
+logsift cloudwatch get /aws/lambda/my-function prefix --tail | logsift inspect
+```
+
+Time formats for `--start`/`--end`: `5m`, `1h`, `2d`, `1week`, or ISO 8601.
+
+AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or standard environment variables.
 
 ## Keybindings
 
 ### Navigation
 
-| Key | Action |
-| --- | ------ |
-| Up / Down | Move between log lines |
-| PgUp / PgDn | Page up / down |
-| Home / End | Jump to first / last line |
-| G | Jump to bottom |
-| q | Quit |
+| Key         | Action                    |
+| ----------- | ------------------------- |
+| Up / Down   | Move between log lines    |
+| PgUp / PgDn | Page up / down            |
+| Home / End  | Jump to first / last line |
+| gg          | Jump to first line        |
+| G           | Jump to last line         |
 
 ### JSON Display
 
-| Key | Action |
-| --- | ------ |
-| j | Toggle pretty-print for ALL JSON lines |
-| Enter | Toggle pretty-print for the current line |
+| Key   | Action                                            |
+| ----- | ------------------------------------------------- |
+| j     | Toggle pretty-print for ALL JSON lines            |
+| Enter | Toggle pretty-print for the current line (sticky) |
+| n     | Toggle line numbers                               |
 
 ### Filtering
 
-| Key | Action |
-| --- | ------ |
-| / | Filter in: show only lines matching a pattern |
-| \ | Filter out: hide lines matching a pattern |
-| f | Filter by JSON key-value pair (on JSON lines) |
-| c | Clear all filters |
-| 1-9 | Toggle individual filters on/off |
+| Key | Action                                   |
+| --- | ---------------------------------------- |
+| /   | Filter in (text or key=value)            |
+| \   | Filter out (text or key=value)           |
+| m   | Manage filters (reorder, toggle, delete) |
+| c   | Clear all filters                        |
+| 1-9 | Toggle individual filters on/off         |
+
+On JSON lines, `/` and `\` show key-value suggestions.
+
+### Tailing
+
+| Key | Action                            |
+| --- | --------------------------------- |
+| p   | Pause/resume tailing              |
+| G   | Jump to bottom (follow new lines) |
 
 ### Sessions
 
-| Key | Action |
-| --- | ------ |
-| s | Save current filters as a named session |
-| l | Load a saved session |
+| Key | Action                                  |
+| --- | --------------------------------------- |
+| s   | Save current filters as a named session |
+| l   | Load a saved session                    |
 
-### Search
+### General
 
-| Key | Action |
-| --- | ------ |
-| ? | Search within log lines |
-| n / N | Next / previous search match |
-| h | Show help screen |
+| Key  | Action           |
+| ---- | ---------------- |
+| h, ? | Show help screen |
+| q    | Quit             |
 
 ## Log Format
 
@@ -100,7 +143,7 @@ Lines without a recognized timestamp are displayed as-is.
 
 ## Sessions
 
-Filter sessions are stored in `~/.config/logsift/sessions/` as TOML files. You can load a session on startup with the `--session` flag or manage sessions interactively with `s` (save) and `l` (load).
+Filter sessions are stored in `~/.config/logsift/sessions/` as TOML files. Filters are auto-saved on every change. Use `--session` to load a session on startup.
 
 ## Development
 
@@ -113,7 +156,7 @@ cd logsift
 uv sync
 
 # Run from source
-uv run logsift sample.log
+uv run logsift inspect sample.log
 
 # Run tests
 uv run pytest

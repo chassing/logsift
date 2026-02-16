@@ -24,6 +24,7 @@ class LogView(ScrollView, can_focus=True):
     DEFAULT_CSS = """
     LogView {
         background: $surface;
+        height: 1fr;
     }
 
     LogView > .logview--highlight {

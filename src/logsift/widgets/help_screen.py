@@ -33,16 +33,22 @@ HELP_TEXT = """\
   On JSON lines, / and \\ show key-value suggestions.
   Filters are auto-saved as sessions.
 
-[bold]Tailing (--tail / -t)[/bold]
+[bold]Tailing[/bold]
   p             Pause/resume tailing
   G             Jump to bottom (follow new lines)
 
-  Pipe input is always tailed automatically.
+  Tailing is on by default. Use --no-tail to disable.
 
 [bold]Sessions[/bold]
   s             Save current filters as named session
   l             Load a saved session
   --session/-s  Load session on startup (CLI)
+
+[bold]CLI Commands[/bold]
+  logsift inspect [FILE]           View log file or pipe
+  logsift cloudwatch get ...       Download CloudWatch logs
+  logsift cloudwatch groups        List log groups
+  logsift cloudwatch streams ...   List log streams
 
 [bold]General[/bold]
   h, ?          Show this help

@@ -68,15 +68,10 @@ async def read_file_async(path: Path, tail: bool = False) -> AsyncIterator[LogLi
                 await asyncio.sleep(0.1)
 
 
-async def read_stdin_async() -> AsyncIterator[LogLine]:
-    """Read log lines from stdin asynchronously."""
+async def read_pipe_async(pipe_fd: int) -> AsyncIterator[LogLine]:
+    """Read log lines from a pipe file descriptor asynchronously."""
     line_number = 0
-    loop = asyncio.get_event_loop()
-    reader = asyncio.StreamReader()
-    await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(reader), sys.stdin)
-    while True:
-        line_bytes = await reader.readline()
-        if not line_bytes:
-            break
-        line_number += 1
-        yield parse_line(line_number, line_bytes.decode().rstrip("\n"))
+    async with aiofiles.open(pipe_fd, closefd=True) as f:
+        async for raw_line in f:
+            line_number += 1
+            yield parse_line(line_number, raw_line.rstrip("\n"))
