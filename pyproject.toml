@@ -1,5 +1,5 @@
 [project]
-name = "logsift"
+name = "logdelve"
 version = "0.1.0"
 description = "A CLI/TUI tool for viewing and filtering log lines"
 readme = "README.md"
@@ -27,12 +27,12 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/chassing/logsift"
-Repository = "https://github.com/chassing/logsift"
-Issues = "https://github.com/chassing/logsift/issues"
+Homepage = "https://github.com/chassing/logdelve"
+Repository = "https://github.com/chassing/logdelve"
+Issues = "https://github.com/chassing/logdelve/issues"
 
 [project.scripts]
-logsift = "logsift.cli:main"
+logdelve = "logdelve.cli:main"
 
 [project.optional-dependencies]
 aws = ["boto3>=1.42.49"]

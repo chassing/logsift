@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from logsift.models import ContentType, LogLine
+from logdelve.models import ContentType, LogLine
 
 
 class TestLogLine:

@@ -25,7 +25,7 @@ def create_client(
     try:
         import boto3
     except ImportError:
-        print("Error: boto3 not installed. Run: pip install logsift[aws]", file=sys.stderr)
+        print("Error: boto3 not installed. Run: pip install logdelve[aws]", file=sys.stderr)
         sys.exit(1)
 
     session = boto3.Session(

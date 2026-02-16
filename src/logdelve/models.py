@@ -1,4 +1,4 @@
-"""Pydantic models for logsift."""
+"""Pydantic models for logdelve."""
 
 from __future__ import annotations
 

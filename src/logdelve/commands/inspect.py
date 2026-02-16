@@ -9,7 +9,7 @@ from typing import Annotated
 
 import typer
 
-from logsift.reader import is_pipe, read_file
+from logdelve.reader import is_pipe, read_file
 
 
 def _setup_pipe_input() -> int:
@@ -52,7 +52,7 @@ def inspect(
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
 
-    from logsift.app import LogSiftApp
+    from logdelve.app import LogSiftApp
 
     log_app = LogSiftApp(
         lines=lines,

@@ -1,4 +1,4 @@
-"""CloudWatch subcommands for logsift."""
+"""CloudWatch subcommands for logdelve."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from logsift.aws import (
+from logdelve.aws import (
     create_client,
     get_log_events,
     list_log_groups,
     list_log_streams,
     tail_log_events,
 )
-from logsift.utils import parse_time
+from logdelve.utils import parse_time
 
 if TYPE_CHECKING:
     from mypy_boto3_logs import CloudWatchLogsClient

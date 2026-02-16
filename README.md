@@ -1,4 +1,4 @@
-# logsift
+# logdelve
 
 A terminal UI tool for viewing and filtering log lines. Think of it as a lightweight, interactive log viewer with JSON awareness.
 
@@ -20,56 +20,56 @@ Requires Python 3.13+.
 
 ```bash
 # Install with uv
-uv tool install logsift
+uv tool install logdelve
 
 # Or install with pip
-pip install logsift
+pip install logdelve
 
 # With AWS CloudWatch support
-pip install logsift[aws]
+pip install logdelve[aws]
 ```
 
 ## Commands
 
-### `logsift inspect` - View log files
+### `logdelve inspect` - View log files
 
 ```bash
 # View a log file (auto-tails by default)
-logsift inspect app.log
+logdelve inspect app.log
 
 # Pipe logs from another command
-kubectl logs pod-name | logsift inspect
+kubectl logs pod-name | logdelve inspect
 
 # Disable automatic tailing
-logsift inspect --no-tail app.log
+logdelve inspect --no-tail app.log
 
 # Load a saved filter session
-logsift inspect --session my-filters app.log
+logdelve inspect --session my-filters app.log
 ```
 
-### `logsift cloudwatch` - AWS CloudWatch logs
+### `logdelve cloudwatch` - AWS CloudWatch logs
 
-Requires `logsift[aws]` (boto3).
+Requires `logdelve[aws]` (boto3).
 
 ```bash
 # List log groups
-logsift cloudwatch groups
-logsift cloudwatch groups /aws/lambda/
+logdelve cloudwatch groups
+logdelve cloudwatch groups /aws/lambda/
 
 # List streams for a log group
-logsift cloudwatch streams /aws/lambda/my-function
+logdelve cloudwatch streams /aws/lambda/my-function
 
 # Download recent logs (last 5 minutes by default)
-logsift cloudwatch get /aws/lambda/my-function stream-prefix
+logdelve cloudwatch get /aws/lambda/my-function stream-prefix
 
 # Download with time range
-logsift cloudwatch get /aws/lambda/my-function prefix -s 1h -e 30m
+logdelve cloudwatch get /aws/lambda/my-function prefix -s 1h -e 30m
 
 # Download and view in TUI
-logsift cloudwatch get /aws/lambda/my-function prefix | logsift inspect
+logdelve cloudwatch get /aws/lambda/my-function prefix | logdelve inspect
 
 # Tail CloudWatch logs live
-logsift cloudwatch get /aws/lambda/my-function prefix --tail | logsift inspect
+logdelve cloudwatch get /aws/lambda/my-function prefix --tail | logdelve inspect
 ```
 
 Time formats for `--start`/`--end`: `5m`, `1h`, `2d`, `1week`, `14:30`, or ISO 8601. All times in UTC.
@@ -129,7 +129,7 @@ On JSON lines, `/` and `\` show key-value suggestions.
 
 ## Log Format
 
-logsift expects each line to begin with a timestamp, followed by either a JSON object or plain text:
+logdelve expects each line to begin with a timestamp, followed by either a JSON object or plain text:
 
 ```text
 2024-01-15T10:30:00Z {"log_level": "info", "message": "Request processed", "duration_ms": 42}
@@ -141,20 +141,20 @@ Lines without a recognized timestamp are displayed as-is.
 
 ## Sessions
 
-Filter sessions are stored in `~/.config/logsift/sessions/` as TOML files. Filters are auto-saved on every change. Use `--session` to load a session on startup.
+Filter sessions are stored in `~/.config/logdelve/sessions/` as TOML files. Filters are auto-saved on every change. Use `--session` to load a session on startup.
 
 ## Development
 
 ```bash
 # Clone the repo
-git clone https://github.com/chassing/logsift.git
-cd logsift
+git clone https://github.com/chassing/logdelve.git
+cd logdelve
 
 # Install dependencies
 uv sync
 
 # Run from source
-uv run logsift inspect sample.log
+uv run logdelve inspect sample.log
 
 # Run all checks (lint, format, typecheck, tests)
 make test

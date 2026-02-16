@@ -11,8 +11,8 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
-from logsift.filters import flatten_json
-from logsift.models import FilterRule, FilterType
+from logdelve.filters import flatten_json
+from logdelve.models import FilterRule, FilterType
 
 
 class FilterDialog(ModalScreen[FilterRule | None]):

@@ -10,7 +10,7 @@ from rich.style import Style
 from rich.text import Text
 from textual.strip import Strip
 
-from logsift.models import ContentType, LogLine
+from logdelve.models import ContentType, LogLine
 
 _json_highlighter = JSONHighlighter()
 

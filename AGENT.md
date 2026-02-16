@@ -1,8 +1,8 @@
-# AGENT.md - Claude Code Instructions for logsift
+# AGENT.md - Claude Code Instructions for logdelve
 
 ## Project Overview
 
-logsift is a CLI/TUI tool for viewing and filtering log lines. It reads log lines from files or stdin, parses timestamps and JSON content, and presents them in an interactive terminal UI built with Textual.
+logdelve is a CLI/TUI tool for viewing and filtering log lines. It reads log lines from files or stdin, parses timestamps and JSON content, and presents them in an interactive terminal UI built with Textual.
 
 ## Tech Stack
 
@@ -21,12 +21,12 @@ logsift is a CLI/TUI tool for viewing and filtering log lines. It reads log line
 ## Project Layout
 
 ```text
-logsift/
+logdelve/
 ├── pyproject.toml
 ├── src/
-│   └── logsift/
+│   └── logdelve/
 │       ├── __init__.py
-│       ├── __main__.py        # python -m logsift
+│       ├── __main__.py        # python -m logdelve
 │       ├── cli.py             # typer CLI
 │       ├── app.py             # Textual App subclass
 │       ├── models.py          # pydantic models
@@ -66,7 +66,7 @@ logsift/
 
 ### Textual
 
-- All CSS goes in `.tcss` files under `src/logsift/styles/`, not inline.
+- All CSS goes in `.tcss` files under `src/logdelve/styles/`, not inline.
 - Use `compose()` for building widget trees.
 - Use `@work` decorator for background/async tasks.
 - Use reactive attributes for state that should trigger UI updates.
@@ -76,7 +76,7 @@ logsift/
 ### CLI
 
 - Use typer for all CLI argument/option handling.
-- Entry point: `logsift.cli:main`
+- Entry point: `logdelve.cli:main`
 
 ### Data Models
 
@@ -86,8 +86,8 @@ logsift/
 
 ### Config & Sessions
 
-- Config directory: `~/.config/logsift/` (via platformdirs)
-- Session files: `~/.config/logsift/sessions/<name>.toml`
+- Config directory: `~/.config/logdelve/` (via platformdirs)
+- Session files: `~/.config/logdelve/sessions/<name>.toml`
 - Use stdlib `tomllib` for reading TOML, `tomli-w` for writing.
 
 ### Testing

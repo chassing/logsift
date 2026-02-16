@@ -25,8 +25,8 @@ All notable changes to this project will be documented in this file.
 - **Status bar**: line counts, filter counts, tail indicator
 - **Footer**: visible keyboard shortcuts
 - **Help screen**: `?` or `h` with full keybinding reference
-- **AWS CloudWatch**: `logsift cloudwatch get/groups/streams` commands
+- **AWS CloudWatch**: `logdelve cloudwatch get/groups/streams` commands
 - **CloudWatch features**: `--message-key` extraction, `--tail` polling, pagination
 - **Time parsing**: relative (`5m`, `1h`, `2days`, `1week`), time-only (`14:30`), ISO 8601
-- **Optional boto3**: `pip install logsift[aws]` with clear error if missing
+- **Optional boto3**: `pip install logdelve[aws]` with clear error if missing
 - **CI/CD**: GitHub Actions for test/lint/typecheck and PyPI publishing

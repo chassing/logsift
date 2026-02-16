@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from rich.style import Style
 
-from logsift.models import ContentType, LogLine
-from logsift.widgets.log_line import get_line_height, render_json_expanded
+from logdelve.models import ContentType, LogLine
+from logdelve.widgets.log_line import get_line_height, render_json_expanded
 
 
 def _make_json_line(line_number: int = 1, json_str: str = '{"key": "value"}') -> LogLine:

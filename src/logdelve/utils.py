@@ -1,4 +1,4 @@
-"""Shared utilities for logsift."""
+"""Shared utilities for logdelve."""
 
 from __future__ import annotations
 

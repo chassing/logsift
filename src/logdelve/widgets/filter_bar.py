@@ -6,7 +6,7 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widget import Widget
 
-from logsift.models import FilterRule
+from logdelve.models import FilterRule
 
 
 class FilterBar(Widget):

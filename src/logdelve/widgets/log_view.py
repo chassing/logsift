@@ -13,9 +13,9 @@ from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
-from logsift.filters import apply_filters, check_line
-from logsift.models import ContentType, FilterRule, LogLine
-from logsift.widgets.log_line import get_line_height, render_json_expanded
+from logdelve.filters import apply_filters, check_line
+from logdelve.models import ContentType, FilterRule, LogLine
+from logdelve.widgets.log_line import get_line_height, render_json_expanded
 
 
 class LogView(ScrollView, can_focus=True):

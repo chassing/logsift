@@ -1,4 +1,4 @@
-"""Textual application for logsift."""
+"""Textual application for logdelve."""
 
 from __future__ import annotations
 
@@ -12,16 +12,16 @@ from textual.binding import Binding, BindingType
 from textual.widgets import Footer
 from textual.worker import get_current_worker
 
-from logsift.models import ContentType, FilterRule, FilterType, LogLine
-from logsift.reader import read_file_async, read_pipe_async
-from logsift.session import create_session, load_session, save_session
-from logsift.widgets.filter_bar import FilterBar
-from logsift.widgets.filter_dialog import FilterDialog
-from logsift.widgets.filter_manage_dialog import FilterManageDialog
-from logsift.widgets.help_screen import HelpScreen
-from logsift.widgets.log_view import LogView
-from logsift.widgets.session_dialog import SessionAction, SessionManageDialog
-from logsift.widgets.status_bar import StatusBar
+from logdelve.models import ContentType, FilterRule, FilterType, LogLine
+from logdelve.reader import read_file_async, read_pipe_async
+from logdelve.session import create_session, load_session, save_session
+from logdelve.widgets.filter_bar import FilterBar
+from logdelve.widgets.filter_dialog import FilterDialog
+from logdelve.widgets.filter_manage_dialog import FilterManageDialog
+from logdelve.widgets.help_screen import HelpScreen
+from logdelve.widgets.log_view import LogView
+from logdelve.widgets.session_dialog import SessionAction, SessionManageDialog
+from logdelve.widgets.status_bar import StatusBar
 
 
 class LogSiftApp(App[None]):

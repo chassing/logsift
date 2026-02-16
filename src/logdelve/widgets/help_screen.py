@@ -43,10 +43,10 @@ HELP_TEXT = """\
   --session/-s  Load session on startup (CLI)
 
 [bold]CLI Commands[/bold]
-  logsift inspect [FILE]           View log file or pipe
-  logsift cloudwatch get ...       Download CloudWatch logs
-  logsift cloudwatch groups        List log groups
-  logsift cloudwatch streams ...   List log streams
+  logdelve inspect [FILE]           View log file or pipe
+  logdelve cloudwatch get ...       Download CloudWatch logs
+  logdelve cloudwatch groups        List log groups
+  logdelve cloudwatch streams ...   List log streams
 
 [bold]General[/bold]
   h, ?          Show this help

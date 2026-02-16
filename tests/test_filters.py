@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from logsift.filters import apply_filters
-from logsift.models import ContentType, FilterRule, FilterType, LogLine
+from logdelve.filters import apply_filters
+from logdelve.models import ContentType, FilterRule, FilterType, LogLine
 
 
 def _make_line(line_number: int, raw: str) -> LogLine:

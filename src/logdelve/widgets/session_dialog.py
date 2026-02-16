@@ -12,7 +12,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
-from logsift.session import delete_session, list_sessions, rename_session
+from logdelve.session import delete_session, list_sessions, rename_session
 
 
 class SessionAction:

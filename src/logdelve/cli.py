@@ -1,11 +1,11 @@
-"""CLI entry point for logsift."""
+"""CLI entry point for logdelve."""
 
 from __future__ import annotations
 
 import typer
 
-from logsift.commands.cloudwatch import cw_app
-from logsift.commands.inspect import inspect
+from logdelve.commands.cloudwatch import cw_app
+from logdelve.commands.inspect import inspect
 
 app = typer.Typer(add_completion=False)
 app.command()(inspect)

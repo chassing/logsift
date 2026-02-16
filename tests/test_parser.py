@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from logsift.models import ContentType
-from logsift.parser import classify_content, extract_timestamp, parse_line
+from logdelve.models import ContentType
+from logdelve.parser import classify_content, extract_timestamp, parse_line
 
 
 class TestExtractTimestamp:

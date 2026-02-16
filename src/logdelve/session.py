@@ -9,8 +9,8 @@ from typing import Any
 
 import tomli_w
 
-from logsift.config import get_sessions_dir
-from logsift.models import FilterRule, Session
+from logdelve.config import get_sessions_dir
+from logdelve.models import FilterRule, Session
 
 
 def save_session(session: Session) -> Path:

@@ -1,1 +1,0 @@
-"""logsift CLI commands."""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from logsift.models import FilterRule, FilterType, LogLine
+from logdelve.models import FilterRule, FilterType, LogLine
 
 
 def apply_filters(lines: list[LogLine], rules: list[FilterRule]) -> list[int]:

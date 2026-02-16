@@ -7,7 +7,7 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-from logsift.models import ContentType, LogLine
+from logdelve.models import ContentType, LogLine
 
 # Month name mapping for syslog-style timestamps
 _MONTH_MAP: dict[str, int] = {

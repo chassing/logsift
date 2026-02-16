@@ -9,8 +9,8 @@ from pathlib import Path
 
 import aiofiles
 
-from logsift.models import LogLine
-from logsift.parser import parse_line
+from logdelve.models import LogLine
+from logdelve.parser import parse_line
 
 
 def read_file(path: Path) -> list[LogLine]:

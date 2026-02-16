@@ -6,7 +6,7 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
-from logsift.aws import (
+from logdelve.aws import (
     _extract_message,
     _format_event,
     _ms_to_iso,
@@ -15,7 +15,7 @@ from logsift.aws import (
     list_log_groups,
     list_log_streams,
 )
-from logsift.utils import parse_time
+from logdelve.utils import parse_time
 
 
 class TestParseTime:

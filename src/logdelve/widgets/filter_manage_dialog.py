@@ -12,7 +12,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from logsift.models import FilterRule, FilterType
+from logdelve.models import FilterRule, FilterType
 
 
 class FilterManageDialog(ModalScreen[list[FilterRule] | None]):

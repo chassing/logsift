@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from logsift.models import FilterRule, FilterType
-from logsift.session import create_session, delete_session, list_sessions, load_session, save_session
+from logdelve.models import FilterRule, FilterType
+from logdelve.session import create_session, delete_session, list_sessions, load_session, save_session
 
 
 class TestSession:
     def test_save_and_load_roundtrip(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             rules = [
                 FilterRule(filter_type=FilterType.INCLUDE, pattern="ERROR"),
                 FilterRule(filter_type=FilterType.EXCLUDE, pattern="debug"),
@@ -27,7 +27,7 @@ class TestSession:
             assert loaded.filters[1].pattern == "debug"
 
     def test_save_and_load_json_key_filter(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             rules = [
                 FilterRule(
                     filter_type=FilterType.INCLUDE,
@@ -48,7 +48,7 @@ class TestSession:
             assert f.json_value == "error"
 
     def test_list_sessions(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             save_session(create_session("alpha", []))
             save_session(create_session("beta", []))
             save_session(create_session("gamma", []))
@@ -57,11 +57,11 @@ class TestSession:
             assert names == ["alpha", "beta", "gamma"]
 
     def test_list_sessions_empty(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             assert list_sessions() == []
 
     def test_load_nonexistent_session(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             try:
                 load_session("nonexistent")
                 assert False, "Should have raised FileNotFoundError"  # noqa: B011
@@ -69,7 +69,7 @@ class TestSession:
                 pass
 
     def test_delete_session(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             save_session(create_session("to-delete", []))
             assert "to-delete" in list_sessions()
 
@@ -77,7 +77,7 @@ class TestSession:
             assert "to-delete" not in list_sessions()
 
     def test_overwrite_session(self, tmp_path: object) -> None:
-        with patch("logsift.session.get_sessions_dir", return_value=tmp_path):
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
             rules1 = [FilterRule(filter_type=FilterType.INCLUDE, pattern="first")]
             save_session(create_session("overwrite", rules1))
 
