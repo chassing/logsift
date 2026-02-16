@@ -9,8 +9,8 @@ A terminal UI tool for viewing and filtering log lines. Think of it as a lightwe
 - **JSON awareness**: Detects JSON content in log lines and offers pretty-printing with syntax highlighting
 - **Pretty-print toggle**: Switch between compact and expanded JSON view, globally or per-line
 - **Interactive filtering**: Filter log lines by text pattern or JSON key-value pairs (include or exclude)
-- **Filter management**: Reorder, toggle, delete filters with a dedicated dialog
-- **Named sessions**: Save and load filter configurations by name, with auto-save
+- **Filter management**: Reorder, toggle, delete, clear filters with a dedicated dialog
+- **Session management**: Save, load, rename, delete filter sessions with auto-save
 - **Live tailing**: Follow growing log files in real-time with pause/resume
 - **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events
 
@@ -54,7 +54,7 @@ Requires `logsift[aws]` (boto3).
 ```bash
 # List log groups
 logsift cloudwatch groups
-logsift cloudwatch groups -p /aws/lambda/
+logsift cloudwatch groups /aws/lambda/
 
 # List streams for a log group
 logsift cloudwatch streams /aws/lambda/my-function
@@ -72,7 +72,7 @@ logsift cloudwatch get /aws/lambda/my-function prefix | logsift inspect
 logsift cloudwatch get /aws/lambda/my-function prefix --tail | logsift inspect
 ```
 
-Time formats for `--start`/`--end`: `5m`, `1h`, `2d`, `1week`, or ISO 8601.
+Time formats for `--start`/`--end`: `5m`, `1h`, `2d`, `1week`, `14:30`, or ISO 8601. All times in UTC.
 
 AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or standard environment variables.
 
@@ -98,13 +98,12 @@ AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or 
 
 ### Filtering
 
-| Key | Action                                   |
-| --- | ---------------------------------------- |
-| /   | Filter in (text or key=value)            |
-| \   | Filter out (text or key=value)           |
-| m   | Manage filters (reorder, toggle, delete) |
-| c   | Clear all filters                        |
-| 1-9 | Toggle individual filters on/off         |
+| Key | Action                                          |
+| --- | ----------------------------------------------- |
+| /   | Filter in (text or key=value)                   |
+| \   | Filter out (text or key=value)                  |
+| m   | Manage filters (toggle, delete, clear, reorder) |
+| 1-9 | Toggle individual filters on/off                |
 
 On JSON lines, `/` and `\` show key-value suggestions.
 
@@ -117,10 +116,9 @@ On JSON lines, `/` and `\` show key-value suggestions.
 
 ### Sessions
 
-| Key | Action                                  |
-| --- | --------------------------------------- |
-| s   | Save current filters as a named session |
-| l   | Load a saved session                    |
+| Key | Action                                              |
+| --- | --------------------------------------------------- |
+| s   | Session manager (load, save, delete, rename)        |
 
 ### General
 
@@ -133,7 +131,7 @@ On JSON lines, `/` and `\` show key-value suggestions.
 
 logsift expects each line to begin with a timestamp, followed by either a JSON object or plain text:
 
-```
+```text
 2024-01-15T10:30:00Z {"log_level": "info", "message": "Request processed", "duration_ms": 42}
 2024-01-15T10:30:01Z Connection established from 192.168.1.1
 Jan 15 10:30:02 myhost syslogd: restart
