@@ -1,3 +1,19 @@
+<p align="center">
+  <img src="docs/logo.svg" alt="logdelve" width="480">
+</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/logdelve/"><img src="https://img.shields.io/pypi/v/logdelve" alt="PyPI"></a>
+  <a href="https://pypi.org/project/logdelve/"><img src="https://img.shields.io/pypi/pyversions/logdelve" alt="Python versions"></a>
+  <img src="https://img.shields.io/pypi/l/logdelve" alt="License">
+  <a href="https://pypi.org/project/logdelve/"><img src="https://img.shields.io/pypi/dm/logdelve" alt="Downloads"></a>
+  <br>
+  <a href="https://github.com/chassing/logdelve/actions/workflows/ci.yml"><img src="https://github.com/chassing/logdelve/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/chassing/logdelve/actions/workflows/publish.yml"><img src="https://github.com/chassing/logdelve/actions/workflows/publish.yml/badge.svg" alt="Publish"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/type--checked-mypy-blue.svg" alt="mypy"></a>
+</p>
+
 # logdelve
 
 A terminal UI tool for viewing and filtering log lines. Think of it as a lightweight, interactive log viewer with JSON awareness.
@@ -116,9 +132,9 @@ On JSON lines, `/` and `\` show key-value suggestions.
 
 ### Sessions
 
-| Key | Action                                              |
-| --- | --------------------------------------------------- |
-| s   | Session manager (load, save, delete, rename)        |
+| Key | Action                                       |
+| --- | -------------------------------------------- |
+| s   | Session manager (load, save, delete, rename) |
 
 ### General
 
