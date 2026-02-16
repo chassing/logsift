@@ -63,6 +63,22 @@ def delete_session(name: str) -> None:
         path.unlink()
 
 
+def rename_session(old_name: str, new_name: str) -> None:
+    """Rename a saved session."""
+    sessions_dir = get_sessions_dir()
+    old_path = sessions_dir / f"{old_name}.toml"
+    if old_path.exists():
+        session = load_session(old_name)
+        session = Session(
+            name=new_name,
+            filters=session.filters,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+        )
+        save_session(session)
+        old_path.unlink()
+
+
 def create_session(name: str, filters: list[FilterRule]) -> Session:
     """Create a new Session with current timestamp."""
     now = datetime.now(tz=UTC)

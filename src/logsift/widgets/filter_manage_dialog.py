@@ -52,6 +52,7 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         Binding("space", "toggle_filter", "Toggle"),
         Binding("enter", "toggle_filter", "Toggle", show=False),
         Binding("d", "delete_filter", "Delete"),
+        Binding("c", "clear_all", "Clear all"),
         Binding("k", "move_up", "Move up"),
         Binding("i", "move_down", "Move down"),
     ]
@@ -64,7 +65,7 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         with Vertical():
             yield Label("Manage filters", classes="title")
             yield OptionList(id="filter-list")
-            yield Label("Space/Enter: toggle  d: delete  k/i: move up/down  Esc: done", classes="hint")
+            yield Label("Space: toggle  d: delete  c: clear all  k/i: move  Esc: done", classes="hint")
 
     def on_mount(self) -> None:
         self._rebuild_list()
@@ -109,6 +110,11 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         idx = self._get_highlighted()
         if idx is not None and 0 <= idx < len(self._filters):
             self._filters.pop(idx)
+            self._rebuild_list()
+
+    def action_clear_all(self) -> None:
+        if self._filters:
+            self._filters.clear()
             self._rebuild_list()
 
     def action_move_up(self) -> None:

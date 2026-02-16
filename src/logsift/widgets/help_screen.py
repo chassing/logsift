@@ -26,8 +26,7 @@ HELP_TEXT = """\
 [bold]Filtering[/bold]
   /             Filter in (text or key=value)
   \\             Filter out (text or key=value)
-  m             Manage filters (reorder, toggle, delete)
-  c             Clear all filters
+  m             Manage filters (toggle, delete, clear, reorder)
   1-9           Toggle individual filter on/off
 
   On JSON lines, / and \\ show key-value suggestions.
@@ -40,8 +39,7 @@ HELP_TEXT = """\
   Tailing is on by default. Use --no-tail to disable.
 
 [bold]Sessions[/bold]
-  s             Save current filters as named session
-  l             Load a saved session
+  s             Session manager (load, save, delete, rename)
   --session/-s  Load session on startup (CLI)
 
 [bold]CLI Commands[/bold]

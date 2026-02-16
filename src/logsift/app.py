@@ -20,7 +20,7 @@ from logsift.widgets.filter_dialog import FilterDialog
 from logsift.widgets.filter_manage_dialog import FilterManageDialog
 from logsift.widgets.help_screen import HelpScreen
 from logsift.widgets.log_view import LogView
-from logsift.widgets.session_dialog import SessionLoadDialog, SessionSaveDialog
+from logsift.widgets.session_dialog import SessionAction, SessionManageDialog
 from logsift.widgets.status_bar import StatusBar
 
 
@@ -31,16 +31,14 @@ class LogSiftApp(App[None]):
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("q", "quit", "Quit"),
-        Binding("question_mark", "show_help", "Help"),
-        Binding("h", "show_help", "Help", show=False),
         Binding("slash", "filter_in", "Filter in"),
         Binding("backslash", "filter_out", "Filter out"),
         Binding("m", "manage_filters", "Manage filters"),
-        Binding("c", "clear_filters", "Clear"),
+        Binding("s", "manage_sessions", "Sessions"),
+        Binding("q", "quit", "Quit", show=False),
         Binding("p", "toggle_tail_pause", "Pause"),
-        Binding("s", "save_session", "Save"),
-        Binding("l", "load_session", "Load"),
+        Binding("question_mark", "show_help", "Help"),
+        Binding("h", "show_help", "Help", show=False),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
         Binding("3", "toggle_filter(3)", "Toggle 3", show=False),
@@ -205,11 +203,6 @@ class LogSiftApp(App[None]):
             self._filter_rules = result
             self._apply_filters()
 
-    def action_clear_filters(self) -> None:
-        if self._filter_rules:
-            self._filter_rules.clear()
-            self._apply_filters()
-
     def action_toggle_filter(self, index: int) -> None:
         idx = index - 1
         if 0 <= idx < len(self._filter_rules):
@@ -218,35 +211,30 @@ class LogSiftApp(App[None]):
 
     # --- Session actions ---
 
-    def action_save_session(self) -> None:
-        if not self._filter_rules:
-            self.notify("No filters to save", severity="warning")
-            return
-        self.push_screen(SessionSaveDialog(), callback=self._on_save_session)
+    def action_manage_sessions(self) -> None:
+        self.push_screen(SessionManageDialog(current_session=self._session_name), callback=self._on_session_result)
 
-    def _on_save_session(self, name: str | None) -> None:
-        if name is None:
+    def _on_session_result(self, result: SessionAction | None) -> None:
+        if result is None:
             return
-        self._session_name = name
-        session = create_session(name, self._filter_rules)
-        save_session(session)
-        self.notify(f"Session '{name}' saved")
-
-    def action_load_session(self) -> None:
-        self.push_screen(SessionLoadDialog(), callback=self._on_load_session)
-
-    def _on_load_session(self, name: str | None) -> None:
-        if name is None:
-            return
-        try:
-            session = load_session(name)
-        except FileNotFoundError:
-            self.notify(f"Session '{name}' not found", severity="error")
-            return
-        self._session_name = name
-        self._filter_rules = list(session.filters)
-        self._apply_filters()
-        self.notify(f"Session '{name}' loaded")
+        if result.action == "load":
+            try:
+                session = load_session(result.name)
+            except FileNotFoundError:
+                self.notify(f"Session '{result.name}' not found", severity="error")
+                return
+            self._session_name = result.name
+            self._filter_rules = list(session.filters)
+            self._apply_filters()
+            self.notify(f"Session '{result.name}' loaded")
+        elif result.action == "save":
+            if not self._filter_rules:
+                self.notify("No filters to save", severity="warning")
+                return
+            self._session_name = result.name
+            session = create_session(result.name, self._filter_rules)
+            save_session(session)
+            self.notify(f"Session '{result.name}' saved")
 
     # --- Help ---
 

@@ -20,7 +20,7 @@ logsift is a CLI/TUI tool for viewing and filtering log lines. It reads log line
 
 ## Project Layout
 
-```
+```text
 logsift/
 ├── pyproject.toml
 ├── src/
