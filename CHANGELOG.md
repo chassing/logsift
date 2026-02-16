@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - Unreleased
+
+### Added
+
+- **Log level detection**: automatic extraction from JSON fields (`log_level`, `level`, `severity`) and text patterns (`[ERROR]`, `ERROR `, `level=error`)
+- **Log level display**: color-coded line backgrounds (red for errors, yellow for warnings) with single-char badge (E, W, I, D, F, T)
+- **Log level filter**: `e` to cycle minimum level (ALL → ERROR → WARN → INFO)
+- **Level counts**: status bar shows F:n E:n W:n counts
+- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields (`service`, `component`, `app`)
+- **Component display**: color-coded tags with `c` to cycle (tag → full → off)
+- **Compact timestamp**: HH:MM:SS instead of full ISO
+- **Message analysis dialog**: `a` to open, groups log messages by event pattern
+- **Field analysis**: switch to fields mode (`m`) to see JSON field value distributions
+- **Integer field grouping**: =0 vs >0 buckets for numeric fields
+- **Analyze sort/order**: `s` to cycle sort, `r` to reverse order
+- **Filter edit**: `e` in filter manager to edit a filter's pattern inline
+- **Filter suspend/resume**: `x` to suspend all filters, `x` again to restore
+- **CloudWatch stream names**: `[stream-name]` prefix in cloudwatch get output
+
+### Changed
+
+- **CloudWatch output**: includes stream name as `[stream-name]` prefix for component detection
+- **Parser**: strips component prefix before timestamp extraction
+- **Filter manager**: shows case-sensitive indicator `[Aa]`
+
 ## [0.2.0] - 2026-02-16
 
 ### Added

@@ -30,12 +30,17 @@ HELP_TEXT = """\
   j                                     Toggle pretty-print for ALL JSON lines
   Enter                                 Toggle pretty-print for current line (sticky)
   #                                     Toggle line numbers
+  c                                     Cycle component display (tag → full → off)
 
 [bold]Filtering[/bold]
   f                                     Filter in (text, key=value, or regex)
   F                                     Filter out (text, key=value, or regex)
-  m                                     Manage filters (toggle, delete, clear, reorder)
+  m                                     Manage filters (toggle, edit, delete, clear, reorder)
+  x                                     Suspend/resume all filters
+  e                                     Cycle log level filter (ALL → ERROR → WARN → INFO)
   1-9                                   Toggle individual filter on/off
+
+  a                                     Analyze message groups
 
   On JSON lines, f and F show key-value suggestions.
   Filters are auto-saved as sessions.

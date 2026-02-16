@@ -13,12 +13,13 @@ from textual.widgets import Footer
 from textual.worker import get_current_worker
 
 from logdelve.config import load_config, save_config
-from logdelve.models import ContentType, FilterRule, FilterType, LogLine, SearchDirection, SearchQuery
+from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
 from logdelve.reader import read_file_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
 from logdelve.widgets.filter_dialog import FilterDialog
 from logdelve.widgets.filter_manage_dialog import FilterManageDialog
+from logdelve.widgets.groups_dialog import GroupsDialog
 from logdelve.widgets.help_screen import HelpScreen
 from logdelve.widgets.log_view import LogView
 from logdelve.widgets.search_dialog import SearchDialog
@@ -34,13 +35,16 @@ class LogDelveApp(App[None]):
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("slash", "search_forward", "Search"),
-        Binding("question_mark", "search_backward", "Search back"),
+        Binding("slash", "search_forward", "Search", show=False),
+        Binding("question_mark", "search_backward", "Search back", show=False),
         Binding("f", "filter_in", "Filter in"),
         Binding("F", "filter_out", "Filter out"),
-        Binding("m", "manage_filters", "Filters"),
         Binding("s", "manage_sessions", "Sessions"),
-        Binding("t", "toggle_theme", "Theme"),
+        Binding("a", "analyze", "Analyze"),
+        Binding("m", "manage_filters", "Filters", show=False),
+        Binding("x", "toggle_all_filters", "Filters off", show=False),
+        Binding("t", "toggle_theme", "Theme", show=False),
+        Binding("e", "cycle_level_filter", "Level"),
         Binding("q", "quit", "Quit", show=False),
         Binding("p", "toggle_tail_pause", "Pause"),
         Binding("h", "show_help", "Help"),
@@ -75,6 +79,9 @@ class LogDelveApp(App[None]):
         self._tail_paused: bool = False
         self._tail_buffer: list[LogLine] = []
         self._last_search: SearchQuery | None = None
+        self._filters_suspended: bool = False
+        self._suspended_rules: list[FilterRule] = []
+        self._min_level: LogLevel | None = None
         self._config = load_config()
         self.theme = self._config.theme
 
@@ -155,6 +162,7 @@ class LogDelveApp(App[None]):
             status_bar.update_counts(log_view.total_count, log_view.filtered_count)
         else:
             status_bar.update_counts(log_view.total_count)
+        status_bar.set_level_counts(log_view.level_counts, self._min_level)
 
     def _update_search_status(self) -> None:
         """Update status bar with current search match info."""
@@ -244,6 +252,23 @@ class LogDelveApp(App[None]):
             self._filter_rules[idx].enabled = not self._filter_rules[idx].enabled
             self._apply_filters()
 
+    def action_toggle_all_filters(self) -> None:
+        """Suspend/resume all filters at once."""
+        if self._filters_suspended:
+            # Restore
+            self._filter_rules = self._suspended_rules
+            self._suspended_rules = []
+            self._filters_suspended = False
+            self._apply_filters()
+            self.notify("Filters restored")
+        elif self._filter_rules:
+            # Suspend
+            self._suspended_rules = list(self._filter_rules)
+            self._filter_rules = []
+            self._filters_suspended = True
+            self._apply_filters()
+            self.notify("Filters suspended")
+
     # --- Session actions ---
 
     def action_manage_sessions(self) -> None:
@@ -270,6 +295,39 @@ class LogDelveApp(App[None]):
             session = create_session(result.name, self._filter_rules)
             save_session(session)
             self.notify(f"Session '{result.name}' saved")
+
+    # --- Analyze ---
+
+    def action_analyze(self) -> None:
+        """Open message group analysis dialog."""
+        log_view = self.query_one("#log-view", LogView)
+        lines = log_view._lines
+        if not lines:
+            self.notify("No lines to analyze", severity="warning")
+            return
+        self.push_screen(GroupsDialog(lines), callback=self._on_groups_result)
+
+    def _on_groups_result(self, result: FilterRule | None) -> None:
+        if result is not None:
+            self._add_filter(result)
+
+    # --- Level filter ---
+
+    def action_cycle_level_filter(self) -> None:
+        """Cycle through minimum log level: ALL → ERROR → WARN → INFO → ALL."""
+        cycle: list[LogLevel | None] = [None, LogLevel.ERROR, LogLevel.WARN, LogLevel.INFO]
+        try:
+            idx = cycle.index(self._min_level)
+        except ValueError:
+            idx = 0
+        self._min_level = cycle[(idx + 1) % len(cycle)]
+        log_view = self.query_one("#log-view", LogView)
+        log_view.set_min_level(self._min_level)
+        self._update_status_bar()
+        if self._min_level:
+            self.notify(f"Level filter: {self._min_level.value.upper()}+")
+        else:
+            self.notify("Level filter: ALL")
 
     # --- Theme ---
 

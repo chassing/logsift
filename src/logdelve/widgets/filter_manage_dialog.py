@@ -9,14 +9,14 @@ from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Label, OptionList
+from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from logdelve.models import FilterRule, FilterType
 
 
 class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
-    """Modal dialog for managing filters: toggle, reorder, delete."""
+    """Modal dialog for managing filters: toggle, reorder, delete, edit."""
 
     DEFAULT_CSS = """
     FilterManageDialog {
@@ -41,6 +41,16 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         height: 1fr;
     }
 
+    FilterManageDialog > Vertical > Input {
+        width: 100%;
+        margin-top: 1;
+        display: none;
+    }
+
+    FilterManageDialog > Vertical > Input.visible {
+        display: block;
+    }
+
     FilterManageDialog > Vertical > .hint {
         color: $text-muted;
         margin-top: 1;
@@ -51,6 +61,7 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         Binding("escape", "done", "Done"),
         Binding("space", "toggle_filter", "Toggle"),
         Binding("enter", "toggle_filter", "Toggle", show=False),
+        Binding("e", "edit_filter", "Edit"),
         Binding("d", "delete_filter", "Delete"),
         Binding("c", "clear_all", "Clear all"),
         Binding("k", "move_up", "Move up"),
@@ -60,12 +71,17 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
     def __init__(self, filters: list[FilterRule]) -> None:
         super().__init__()
         self._filters = [r.model_copy() for r in filters]
+        self._editing_idx: int | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label("Manage filters", classes="title")
             yield OptionList(id="filter-list")
-            yield Label("Space: toggle  d: delete  c: clear all  k/i: move  Esc: done", classes="hint")
+            yield Input(placeholder="Edit pattern...", id="edit-input")
+            yield Label(
+                "Space: toggle  e: edit  d: delete  c: clear  k/i: move  Esc: done",
+                classes="hint",
+            )
 
     def on_mount(self) -> None:
         self._rebuild_list()
@@ -99,6 +115,9 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
             style = "dim"
         text.append(f"{prefix}{label}", style=style)
 
+        if rule.case_sensitive:
+            text.append(" [Aa]", style="dim")
+
         return text
 
     def _get_highlighted(self) -> int | None:
@@ -106,25 +125,58 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         return ol.highlighted
 
     def action_toggle_filter(self) -> None:
+        if self._editing_idx is not None:
+            return
         idx = self._get_highlighted()
         if idx is not None and 0 <= idx < len(self._filters):
             self._filters[idx].enabled = not self._filters[idx].enabled
-            # Update only the changed option to preserve scroll position
             ol = self.query_one("#filter-list", OptionList)
             ol.replace_option_prompt_at_index(idx, self._format_rule(idx, self._filters[idx]))
 
+    def action_edit_filter(self) -> None:
+        idx = self._get_highlighted()
+        if idx is None or idx >= len(self._filters):
+            return
+        rule = self._filters[idx]
+        if rule.is_json_key:
+            return  # JSON key filters can't be edited as text
+        self._editing_idx = idx
+        inp = self.query_one("#edit-input", Input)
+        inp.value = rule.pattern
+        inp.add_class("visible")
+        inp.focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if self._editing_idx is None:
+            return
+        new_pattern = event.value.strip()
+        if new_pattern:
+            self._filters[self._editing_idx].pattern = new_pattern
+        self._editing_idx = None
+        inp = self.query_one("#edit-input", Input)
+        inp.value = ""
+        inp.remove_class("visible")
+        self._rebuild_list()
+        self.query_one("#filter-list", OptionList).focus()
+
     def action_delete_filter(self) -> None:
+        if self._editing_idx is not None:
+            return
         idx = self._get_highlighted()
         if idx is not None and 0 <= idx < len(self._filters):
             self._filters.pop(idx)
             self._rebuild_list()
 
     def action_clear_all(self) -> None:
+        if self._editing_idx is not None:
+            return
         if self._filters:
             self._filters.clear()
             self._rebuild_list()
 
     def action_move_up(self) -> None:
+        if self._editing_idx is not None:
+            return
         idx = self._get_highlighted()
         if idx is not None and idx > 0:
             self._filters[idx], self._filters[idx - 1] = self._filters[idx - 1], self._filters[idx]
@@ -133,6 +185,8 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
             ol.highlighted = idx - 1
 
     def action_move_down(self) -> None:
+        if self._editing_idx is not None:
+            return
         idx = self._get_highlighted()
         if idx is not None and idx < len(self._filters) - 1:
             self._filters[idx], self._filters[idx + 1] = self._filters[idx + 1], self._filters[idx]
@@ -141,4 +195,12 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
             ol.highlighted = idx + 1
 
     def action_done(self) -> None:
-        self.dismiss(self._filters)
+        if self._editing_idx is not None:
+            # Cancel edit
+            self._editing_idx = None
+            inp = self.query_one("#edit-input", Input)
+            inp.value = ""
+            inp.remove_class("visible")
+            self.query_one("#filter-list", OptionList).focus()
+        else:
+            self.dismiss(self._filters)

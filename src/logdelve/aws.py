@@ -69,12 +69,15 @@ def _extract_message(raw_message: str, message_key: str | None) -> str:
     return raw_message
 
 
-def _format_event(event: FilteredLogEventTypeDef, message_key: str | None = None) -> tuple[str, str]:
-    """Format a single CloudWatch log event as (iso_timestamp, message)."""
+def _format_event(
+    event: FilteredLogEventTypeDef, message_key: str | None = None
+) -> tuple[str, str, str]:
+    """Format a single CloudWatch log event as (iso_timestamp, message, stream_name)."""
     ts = _ms_to_iso(event.get("timestamp", 0))
     raw_msg = event.get("message", "").rstrip("\n")
     msg = _extract_message(raw_msg, message_key)
-    return ts, msg
+    stream = event.get("logStreamName", "")
+    return ts, msg, stream
 
 
 def get_log_events(
@@ -84,8 +87,8 @@ def get_log_events(
     start: datetime,
     end: datetime,
     message_key: str | None = None,
-) -> Iterator[tuple[str, str]]:
-    """Download log events, yield (iso_timestamp, message) tuples."""
+) -> Iterator[tuple[str, str, str]]:
+    """Download log events, yield (iso_timestamp, message, stream_name) tuples."""
     paginator = client.get_paginator("filter_log_events")
     paginate_kwargs = {
         "logGroupName": log_group,
@@ -136,8 +139,8 @@ def tail_log_events(
             if event_id in seen_ids:
                 continue
             seen_ids.add(event_id)
-            ts, msg = _format_event(event, message_key)
-            print(f"{ts} {msg}", flush=True)
+            ts, msg, stream = _format_event(event, message_key)
+            print(f"[{stream}] {ts} {msg}", flush=True)
 
         next_token = response.get("nextToken")
         if next_token:

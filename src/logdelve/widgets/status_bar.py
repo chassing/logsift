@@ -5,6 +5,8 @@ from __future__ import annotations
 from rich.text import Text
 from textual.widget import Widget
 
+from logdelve.models import LogLevel
+
 
 class StatusBar(Widget):
     """Bottom status bar showing line counts, search info, and source."""
@@ -27,6 +29,8 @@ class StatusBar(Widget):
         self._new_lines: int = 0
         self._search_current: int | None = None
         self._search_total: int | None = None
+        self._level_counts: dict[LogLevel, int] = {}
+        self._min_level: LogLevel | None = None
 
     def update_counts(self, total: int, filtered: int | None = None) -> None:
         """Update the line counts."""
@@ -48,6 +52,12 @@ class StatusBar(Widget):
         """Set search match info."""
         self._search_current = current
         self._search_total = total
+        self.refresh()
+
+    def set_level_counts(self, counts: dict[LogLevel, int], min_level: LogLevel | None = None) -> None:
+        """Set log level counts and current min level filter."""
+        self._level_counts = counts
+        self._min_level = min_level
         self.refresh()
 
     def clear_search_info(self) -> None:
@@ -76,6 +86,23 @@ class StatusBar(Widget):
                 text.append("  No matches", style="bold italic")
             else:
                 text.append(f"  [{self._search_current}/{self._search_total}]", style="bold")
+
+        # Level counts
+        if self._level_counts:
+            parts: list[str] = []
+            fatal = self._level_counts.get(LogLevel.FATAL, 0)
+            errors = self._level_counts.get(LogLevel.ERROR, 0)
+            warns = self._level_counts.get(LogLevel.WARN, 0)
+            if fatal:
+                parts.append(f"F:{fatal}")
+            if errors:
+                parts.append(f"E:{errors}")
+            if warns:
+                parts.append(f"W:{warns}")
+            if parts:
+                text.append(f"  {' '.join(parts)}", style="bold")
+            if self._min_level is not None:
+                text.append(f"  ≥{self._min_level.value.upper()}", style="italic")
 
         right_part = self._source
         if right_part:

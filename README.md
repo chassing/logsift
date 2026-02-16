@@ -24,13 +24,16 @@ A terminal UI tool for viewing and filtering log lines. Think of it as a lightwe
 - **Timestamp parsing**: Automatic detection of ISO 8601, syslog, Apache, and other common timestamp formats
 - **JSON awareness**: Detects JSON content in log lines and offers pretty-printing with syntax highlighting
 - **Pretty-print toggle**: Switch between compact and expanded JSON view, globally or per-line
+- **Log level detection**: Automatic extraction from JSON fields and text patterns, color-coded backgrounds
+- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
+- **Message analysis**: Group log messages by event pattern, analyze JSON field value distributions
 - **Search**: Forward and backward search with regex and case-sensitive options, match highlighting
-- **Interactive filtering**: Filter log lines by text pattern, regex, or JSON key-value pairs (include or exclude)
-- **Filter management**: Reorder, toggle, delete, clear filters with a dedicated dialog
+- **Interactive filtering**: Filter by text, regex, JSON key-value, or log level
+- **Filter management**: Reorder, toggle, edit, delete, suspend/resume all filters
 - **Session management**: Save, load, rename, delete filter sessions with auto-save
 - **Live tailing**: Follow growing log files in real-time with pause/resume
 - **Theme support**: Choose from all built-in Textual themes with persistent preference
-- **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events
+- **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events with stream names
 
 ## Installation
 
@@ -115,22 +118,31 @@ AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or 
 | gg          | Jump to first line        |
 | G           | Jump to last line         |
 
-### JSON Display
+### Display
 
-| Key   | Action                                            |
-| ----- | ------------------------------------------------- |
-| j     | Toggle pretty-print for ALL JSON lines            |
+| Key | Action                                            |
+| --- | ------------------------------------------------- |
+| j   | Toggle pretty-print for ALL JSON lines            |
 | Enter | Toggle pretty-print for the current line (sticky) |
-| #     | Toggle line numbers                               |
+| #   | Toggle line numbers                               |
+| c   | Cycle component display (tag → full → off)        |
 
 ### Filtering
 
-| Key | Action                                          |
-| --- | ----------------------------------------------- |
-| f   | Filter in (text, key=value, or regex)           |
-| F   | Filter out (text, key=value, or regex)          |
-| m   | Manage filters (toggle, delete, clear, reorder) |
-| 1-9 | Toggle individual filters on/off                |
+| Key | Action                                                   |
+| --- | -------------------------------------------------------- |
+| f   | Filter in (text, key=value, or regex)                    |
+| F   | Filter out (text, key=value, or regex)                   |
+| e   | Cycle log level filter (ALL → ERROR → WARN → INFO)      |
+| m   | Manage filters (toggle, edit, delete, clear, reorder)    |
+| x   | Suspend/resume all filters                               |
+| 1-9 | Toggle individual filters on/off                         |
+
+### Analysis
+
+| Key | Action                                                   |
+| --- | -------------------------------------------------------- |
+| a   | Analyze: message groups and field value distributions    |
 
 On JSON lines, `f` and `F` show key-value suggestions.
 

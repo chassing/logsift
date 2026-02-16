@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from logdelve.models import ContentType
-from logdelve.parser import classify_content, extract_timestamp, parse_line
+from logdelve.models import ContentType, LogLevel
+from logdelve.parser import classify_content, extract_component, extract_log_level, extract_timestamp, parse_line
 
 
 class TestExtractTimestamp:
@@ -155,3 +155,78 @@ class TestParseLine:
         raw = '2024-01-15T10:30:00Z {"key": "value"}'
         line = parse_line(1, raw)
         assert line.raw == raw
+
+    def test_json_log_level(self) -> None:
+        line = parse_line(1, '2024-01-15T10:30:00Z {"log_level": "error", "msg": "fail"}')
+        assert line.log_level == LogLevel.ERROR
+
+    def test_text_log_level(self) -> None:
+        line = parse_line(1, "2024-01-15T10:30:00Z [ERROR] something broke")
+        assert line.log_level == LogLevel.ERROR
+
+    def test_component_from_bracket_prefix(self) -> None:
+        line = parse_line(1, "[my-pod-abc123] 2024-01-15T10:30:00Z some message")
+        assert line.component == "my-pod-abc123"
+        assert line.timestamp is not None
+
+    def test_component_from_json(self) -> None:
+        line = parse_line(1, '2024-01-15T10:30:00Z {"service": "api-gateway", "msg": "ok"}')
+        assert line.component == "api-gateway"
+
+
+class TestExtractLogLevel:
+    def test_json_log_level(self) -> None:
+        assert extract_log_level("", {"log_level": "info"}) == LogLevel.INFO
+
+    def test_json_level(self) -> None:
+        assert extract_log_level("", {"level": "warning"}) == LogLevel.WARN
+
+    def test_json_severity(self) -> None:
+        assert extract_log_level("", {"severity": "critical"}) == LogLevel.FATAL
+
+    def test_json_case_insensitive(self) -> None:
+        assert extract_log_level("", {"level": "ERROR"}) == LogLevel.ERROR
+
+    def test_bracket_pattern(self) -> None:
+        assert extract_log_level("[ERROR] something failed", None) == LogLevel.ERROR
+
+    def test_bracket_warn(self) -> None:
+        assert extract_log_level("[WARNING] slow query", None) == LogLevel.WARN
+
+    def test_word_pattern(self) -> None:
+        assert extract_log_level("ERROR connection refused", None) == LogLevel.ERROR
+
+    def test_kv_pattern(self) -> None:
+        assert extract_log_level("level=error msg=fail", None) == LogLevel.ERROR
+
+    def test_debug(self) -> None:
+        assert extract_log_level("", {"level": "debug"}) == LogLevel.DEBUG
+
+    def test_trace(self) -> None:
+        assert extract_log_level("", {"level": "trace"}) == LogLevel.TRACE
+
+    def test_no_level(self) -> None:
+        assert extract_log_level("just some text", None) is None
+
+    def test_json_priority_over_text(self) -> None:
+        assert extract_log_level("[ERROR] text", {"level": "info"}) == LogLevel.INFO
+
+
+class TestExtractComponent:
+    def test_docker_compose(self) -> None:
+        assert extract_component("web-service  | some log", None) == "web-service"
+
+    def test_k8s_bracket(self) -> None:
+        assert extract_component("[my-pod-abc123] log msg", None) == "my-pod-abc123"
+
+    def test_json_service(self) -> None:
+        assert extract_component("some line", {"service": "api"}) == "api"
+
+    def test_json_component(self) -> None:
+        assert extract_component("some line", {"component": "worker"}) == "worker"
+
+    def test_no_component(self) -> None:
+        assert extract_component("just text", None) is None
+
+    def test_json_field_priority(self) -> None:
+        assert extract_component("some line", {"service": "svc", "component": "comp"}) == "svc"

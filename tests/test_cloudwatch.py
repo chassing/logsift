@@ -117,20 +117,26 @@ class TestExtractMessage:
 class TestFormatEvent:
     def test_basic_event(self) -> None:
         event = {"timestamp": 1705312200000, "message": "test message"}
-        ts, msg = _format_event(event)  # type: ignore[arg-type]
+        ts, msg, stream = _format_event(event)  # type: ignore[arg-type]
         assert "2024-01-15" in ts
         assert msg == "test message"
+        assert stream == ""
 
     def test_event_with_message_key(self) -> None:
         inner = json.dumps({"message": "inner", "level": "info"})
         event = {"timestamp": 1705312200000, "message": inner}
-        _ts, msg = _format_event(event, message_key="message")  # type: ignore[arg-type]
+        _ts, msg, _stream = _format_event(event, message_key="message")  # type: ignore[arg-type]
         assert msg == "inner"
 
     def test_event_without_message_key(self) -> None:
         event = {"timestamp": 1705312200000, "message": "plain text"}
-        _ts, msg = _format_event(event, message_key="message")  # type: ignore[arg-type]
+        _ts, msg, _stream = _format_event(event, message_key="message")  # type: ignore[arg-type]
         assert msg == "plain text"
+
+    def test_event_with_stream_name(self) -> None:
+        event = {"timestamp": 1705312200000, "message": "test", "logStreamName": "my-pod-abc123"}
+        _ts, _msg, stream = _format_event(event)  # type: ignore[arg-type]
+        assert stream == "my-pod-abc123"
 
 
 class TestGetLogEvents:

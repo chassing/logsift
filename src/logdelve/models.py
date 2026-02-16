@@ -16,6 +16,17 @@ class ContentType(StrEnum):
     TEXT = "text"
 
 
+class LogLevel(StrEnum):
+    """Log severity level."""
+
+    TRACE = "trace"
+    DEBUG = "debug"
+    INFO = "info"
+    WARN = "warn"
+    ERROR = "error"
+    FATAL = "fatal"
+
+
 class LogLine(BaseModel):
     """A single parsed log line."""
 
@@ -25,6 +36,8 @@ class LogLine(BaseModel):
     content_type: ContentType
     content: str
     parsed_json: dict[str, Any] | None = None
+    log_level: LogLevel | None = None
+    component: str | None = None
 
 
 class FilterType(StrEnum):

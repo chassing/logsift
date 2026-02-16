@@ -13,4 +13,5 @@ wheels/
 sample.log
 docs/PLAN.md
 docs/PHASE-*.md
+docs/anomaly-detection*
 .claude

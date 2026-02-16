@@ -79,8 +79,9 @@ def get_logs(
     start_time = parse_time(start)
     end_time = parse_time(end) if end else datetime.now(tz=UTC)
 
-    for ts, msg in get_log_events(client, log_group, stream_prefix, start_time, end_time, message_key=message_key):
-        print(f"{ts} {msg}", flush=tail)
+    events = get_log_events(client, log_group, stream_prefix, start_time, end_time, message_key=message_key)
+    for ts, msg, stream in events:
+        print(f"[{stream}] {ts} {msg}", flush=tail)
 
     if tail:
         tail_log_events(client, log_group, stream_prefix, end_time, message_key=message_key)

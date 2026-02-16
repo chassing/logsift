@@ -5,6 +5,7 @@ from __future__ import annotations
 import bisect
 from typing import Any, ClassVar
 
+from rich.color import Color
 from rich.segment import Segment
 from rich.style import Style
 from textual.binding import Binding, BindingType
@@ -14,9 +15,21 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from logdelve.filters import apply_filters, check_line
-from logdelve.models import ContentType, FilterRule, LogLine, SearchDirection, SearchQuery
+from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchQuery
 from logdelve.search import find_matches
 from logdelve.widgets.log_line import get_line_height, render_json_expanded
+
+# Distinct colors for component tags (work on dark and light backgrounds)
+_COMPONENT_COLORS = [
+    Color.parse("#e06c75"),  # red
+    Color.parse("#61afef"),  # blue
+    Color.parse("#98c379"),  # green
+    Color.parse("#e5c07b"),  # yellow
+    Color.parse("#c678dd"),  # purple
+    Color.parse("#56b6c2"),  # cyan
+    Color.parse("#d19a66"),  # orange
+    Color.parse("#be5046"),  # dark red
+]
 
 
 class LogView(ScrollView, can_focus=True):
@@ -58,6 +71,23 @@ class LogView(ScrollView, can_focus=True):
         background: #9e7c00;
         color: #ffffff;
     }
+
+    LogView > .logview--level-error {
+        background: #3d1518;
+    }
+
+    LogView > .logview--level-warn {
+        background: #3d2e0a;
+    }
+
+    LogView > .logview--level-debug {
+        color: $text-disabled;
+    }
+
+    LogView > .logview--level-fatal {
+        background: #5c1015;
+        text-style: bold;
+    }
     """
 
     COMPONENT_CLASSES: ClassVar[set[str]] = {
@@ -68,6 +98,10 @@ class LogView(ScrollView, can_focus=True):
         "logview--line-number",
         "logview--search-match",
         "logview--search-current",
+        "logview--level-error",
+        "logview--level-warn",
+        "logview--level-debug",
+        "logview--level-fatal",
     }
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -79,9 +113,10 @@ class LogView(ScrollView, can_focus=True):
         Binding("end", "scroll_end", "End", show=False),
         Binding("g", "goto_top_or_prefix", "Top (gg)", show=False),
         Binding("G", "scroll_end", "Bottom", show=False),
-        Binding("j", "toggle_json_global", "JSON"),
+        Binding("j", "toggle_json_global", "JSON", show=False),
         Binding("enter", "toggle_json_line", "Expand", show=False),
-        Binding("#", "toggle_line_numbers", "Lines#"),
+        Binding("#", "toggle_line_numbers", "Lines#", show=False),
+        Binding("c", "cycle_component_display", "Comp", show=False),
         Binding("n", "next_match", "Next", show=False),
         Binding("N", "prev_match", "Prev", show=False),
     ]
@@ -103,6 +138,12 @@ class LogView(ScrollView, can_focus=True):
         # Height tracking for variable-height lines
         self._heights: list[int] = []
         self._offsets: list[int] = []
+        # Level filter
+        self._min_level: LogLevel | None = None
+        # Component display: "tag" (color dot + number), "full" (full name), "off" (hidden)
+        self._component_display: str = "tag"
+        self._component_colors: dict[str, int] = {}
+        self._component_index: dict[str, int] = {}
         # Search state
         self._search_query: SearchQuery | None = None
         self._search_matches: list[tuple[int, int, int]] = []
@@ -113,7 +154,7 @@ class LogView(ScrollView, can_focus=True):
     @property
     def _lines(self) -> list[LogLine]:
         """Get the currently visible lines (filtered or all)."""
-        if self._filtered_indices is not None and self._filter_rules:
+        if self._filtered_indices is not None and self.has_filters:
             return [self._all_lines[i] for i in self._filtered_indices]
         return self._all_lines
 
@@ -127,7 +168,16 @@ class LogView(ScrollView, can_focus=True):
 
     @property
     def has_filters(self) -> bool:
-        return bool(self._filter_rules)
+        return bool(self._filter_rules) or self._min_level is not None
+
+    @property
+    def level_counts(self) -> dict[LogLevel, int]:
+        """Count lines by log level across all (unfiltered) lines."""
+        counts: dict[LogLevel, int] = {}
+        for line in self._all_lines:
+            if line.log_level is not None:
+                counts[line.log_level] = counts.get(line.log_level, 0) + 1
+        return counts
 
     @property
     def has_search(self) -> bool:
@@ -214,12 +264,35 @@ class LogView(ScrollView, can_focus=True):
         region_height = self.scrollable_content_region.height
         return self.scroll_offset.y + region_height >= total_height - 1
 
+    def set_min_level(self, level: LogLevel | None) -> None:
+        """Set minimum log level filter and refresh display."""
+        self._min_level = level
+        old_cursor = self.cursor_line
+        self._apply_filters()
+        visible = self._lines
+        if visible:
+            self.cursor_line = min(old_cursor, len(visible) - 1)
+        else:
+            self.cursor_line = 0
+        if self._search_query:
+            self._compute_search_matches()
+        self.refresh()
+
     def _apply_filters(self) -> None:
         """Recompute filtered indices and update display."""
         if self._filter_rules:
             self._filtered_indices = apply_filters(self._all_lines, self._filter_rules)
         else:
             self._filtered_indices = list(range(len(self._all_lines)))
+        # Apply log level filter on top
+        if self._min_level is not None:
+            level_order = list(LogLevel)
+            min_idx = level_order.index(self._min_level)
+            self._filtered_indices = [
+                i
+                for i in self._filtered_indices
+                if self._passes_level_filter(self._all_lines[i].log_level, level_order, min_idx)
+            ]
         self._recompute_heights()
 
     def _is_expanded(self, line_index: int) -> bool:
@@ -388,7 +461,20 @@ class LogView(ScrollView, can_focus=True):
         json_style = self.get_component_rich_style("logview--json")
         text_style = self.get_component_rich_style("logview--text")
         lineno_style = self.get_component_rich_style("logview--line-number")
-        bg_style = highlight_style if is_highlighted else Style()
+        # Build background: cursor highlight takes priority, then level color
+        if is_highlighted:
+            bg_style = highlight_style
+        elif line.log_level is not None:
+            level_bg_map: dict[LogLevel, str | None] = {
+                LogLevel.FATAL: "logview--level-fatal",
+                LogLevel.ERROR: "logview--level-error",
+                LogLevel.WARN: "logview--level-warn",
+                LogLevel.DEBUG: "logview--level-debug",
+            }
+            level_class = level_bg_map.get(line.log_level)
+            bg_style = self.get_component_rich_style(level_class) if level_class else Style()
+        else:
+            bg_style = Style()
 
         # Get search matches for this line
         line_matches = self._search_matches_by_line.get(line_index)
@@ -423,8 +509,8 @@ class LogView(ScrollView, can_focus=True):
             strip = Strip(segments)
 
         strip = strip.crop(scroll_x, scroll_x + content_width)
-        if is_highlighted:
-            fill_style = Style(bgcolor=highlight_style.bgcolor)
+        if bg_style != Style():
+            fill_style = Style(bgcolor=bg_style.bgcolor)
             strip = strip.extend_cell_length(content_width, fill_style)
         else:
             strip = strip.extend_cell_length(content_width)
@@ -452,9 +538,31 @@ class LogView(ScrollView, can_focus=True):
             lineno_text = f"{line.line_number:>6} "
             segments.append(Segment(lineno_text, lineno_style + bg_style))
 
+        # Level badge (single char, row is already colored by level bg)
+        if line.log_level is not None:
+            badge_chars: dict[LogLevel, str] = {
+                LogLevel.FATAL: "F",
+                LogLevel.ERROR: "E",
+                LogLevel.WARN: "W",
+                LogLevel.INFO: "I",
+                LogLevel.DEBUG: "D",
+                LogLevel.TRACE: "T",
+            }
+            badge_char = badge_chars.get(line.log_level, "?")
+            segments.append(Segment(f"{badge_char} ", Style(bold=True) + bg_style))
+
+        # Component tag
+        if line.component and self._component_display != "off":
+            if self._component_display == "tag":
+                tag_num, tag_style = self._get_component_tag(line.component)
+                segments.append(Segment(f"·{tag_num} ", tag_style + bg_style))
+            else:  # full
+                _, tag_style = self._get_component_tag(line.component)
+                segments.append(Segment(f"[{line.component}] ", tag_style + bg_style))
+
+        # Compact timestamp (HH:MM:SS)
         if line.timestamp is not None:
-            ts_end = len(line.raw) - len(line.content)
-            ts_text = line.raw[:ts_end]
+            ts_text = self._compact_timestamp(line)
             segments.append(Segment(ts_text, timestamp_style + bg_style))
 
         content_style = json_style if line.content_type == ContentType.JSON else text_style
@@ -515,6 +623,13 @@ class LogView(ScrollView, can_focus=True):
         if pos < len(text):
             segments.append(Segment(text[pos:], normal_style))
         return segments
+
+    @staticmethod
+    def _passes_level_filter(level: LogLevel | None, level_order: list[LogLevel], min_idx: int) -> bool:
+        """Check if a log level passes the minimum level filter."""
+        if level is None:
+            return False
+        return level_order.index(level) >= min_idx
 
     def watch_cursor_line(self, _old_value: int, _new_value: int) -> None:
         self._recompute_heights()
@@ -604,6 +719,31 @@ class LogView(ScrollView, can_focus=True):
         """Toggle line number display."""
         self._show_line_numbers = not self._show_line_numbers
         self.refresh()
+
+    def action_cycle_component_display(self) -> None:
+        """Cycle component display: tag → full → off → tag."""
+        cycle = ["tag", "full", "off"]
+        idx = cycle.index(self._component_display)
+        self._component_display = cycle[(idx + 1) % len(cycle)]
+        self.refresh()
+
+    def _get_component_tag(self, component: str) -> tuple[int, Style]:
+        """Get the numeric tag and color style for a component."""
+        if component not in self._component_index:
+            idx = len(self._component_index)
+            self._component_index[component] = idx
+            self._component_colors[component] = idx % len(_COMPONENT_COLORS)
+        color_idx = self._component_colors[component]
+        tag_num = self._component_index[component] + 1
+        color = _COMPONENT_COLORS[color_idx]
+        return tag_num, Style(color=color, bold=True)
+
+    @staticmethod
+    def _compact_timestamp(line: LogLine) -> str:
+        """Format timestamp compactly: HH:MM:SS if same day, else full date."""
+        if line.timestamp is None:
+            return ""
+        return line.timestamp.strftime("%H:%M:%S ")
 
     def action_goto_top_or_prefix(self) -> None:
         """Handle 'g' key: second 'g' goes to top (gg)."""
