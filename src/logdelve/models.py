@@ -40,9 +40,33 @@ class FilterRule(BaseModel):
     filter_type: FilterType
     pattern: str
     enabled: bool = True
+    is_regex: bool = False
+    case_sensitive: bool = False
     is_json_key: bool = False
     json_key: str | None = None
     json_value: str | None = None
+
+
+class SearchDirection(StrEnum):
+    """Direction for text search."""
+
+    FORWARD = "forward"
+    BACKWARD = "backward"
+
+
+class SearchQuery(BaseModel):
+    """A search query with options."""
+
+    pattern: str
+    case_sensitive: bool = False
+    is_regex: bool = False
+    direction: SearchDirection = SearchDirection.FORWARD
+
+
+class AppConfig(BaseModel):
+    """Application configuration persisted to disk."""
+
+    theme: str = "textual-dark"
 
 
 class Session(BaseModel):

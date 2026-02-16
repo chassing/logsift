@@ -12,45 +12,50 @@ from textual.widgets import Static
 
 HELP_TEXT = """\
 [bold]Navigation[/bold]
-  Up/Down       Move between log lines
-  PgUp/PgDn     Page up/down
-  Home/End      Jump to first/last line
-  gg            Jump to first line
-  G             Jump to last line
+  Up/Down                               Move between log lines
+  PgUp/PgDn                             Page up/down
+  Home/End                              Jump to first/last line
+  gg                                    Jump to first line
+  G                                     Jump to last line
+
+[bold]Search[/bold]
+  /                                     Search forward
+  ?                                     Search backward
+  n                                     Next match
+  N                                     Previous match
+
+  Search dialog has case-sensitive and regex options.
 
 [bold]Display[/bold]
-  j             Toggle pretty-print for ALL JSON lines
-  Enter         Toggle pretty-print for current line (sticky)
-  n             Toggle line numbers
+  j                                     Toggle pretty-print for ALL JSON lines
+  Enter                                 Toggle pretty-print for current line (sticky)
+  #                                     Toggle line numbers
 
 [bold]Filtering[/bold]
-  /             Filter in (text or key=value)
-  \\             Filter out (text or key=value)
-  m             Manage filters (toggle, delete, clear, reorder)
-  1-9           Toggle individual filter on/off
+  f                                     Filter in (text, key=value, or regex)
+  F                                     Filter out (text, key=value, or regex)
+  m                                     Manage filters (toggle, delete, clear, reorder)
+  1-9                                   Toggle individual filter on/off
 
-  On JSON lines, / and \\ show key-value suggestions.
+  On JSON lines, f and F show key-value suggestions.
   Filters are auto-saved as sessions.
 
 [bold]Tailing[/bold]
-  p             Pause/resume tailing
-  G             Jump to bottom (follow new lines)
+  p                                     Pause/resume tailing
+  G                                     Jump to bottom (follow new lines)
 
   Tailing is on by default. Use --no-tail to disable.
 
 [bold]Sessions[/bold]
-  s             Session manager (load, save, delete, rename)
-  --session/-s  Load session on startup (CLI)
+  s                                     Session manager (load, save, delete, rename)
+  --session/-s                          Load session on startup (CLI)
 
-[bold]CLI Commands[/bold]
-  logdelve inspect [FILE]           View log file or pipe
-  logdelve cloudwatch get ...       Download CloudWatch logs
-  logdelve cloudwatch groups        List log groups
-  logdelve cloudwatch streams ...   List log streams
+[bold]Theme[/bold]
+  t                                     Toggle dark/light theme
 
 [bold]General[/bold]
-  h, ?          Show this help
-  q             Quit
+  h                                     Show this help
+  q                                     Quit
 """
 
 
@@ -63,9 +68,9 @@ class HelpScreen(ModalScreen[None]):
     }
 
     HelpScreen > VerticalScroll {
-        width: 70;
-        height: 80%;
-        max-height: 30;
+        width: 60%;
+        height: 90%;
+        max-height: 35;
         background: $surface;
         border: tall $accent;
         padding: 1 2;
@@ -75,7 +80,7 @@ class HelpScreen(ModalScreen[None]):
     BINDINGS: ClassVar[list[BindingType]] = [
         ("escape", "dismiss_help", "Close"),
         ("h", "dismiss_help", "Close"),
-        ("question_mark", "dismiss_help", "Close"),
+        ("q", "dismiss_help", "Close"),
     ]
 
     def compose(self) -> ComposeResult:

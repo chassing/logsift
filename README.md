@@ -24,10 +24,12 @@ A terminal UI tool for viewing and filtering log lines. Think of it as a lightwe
 - **Timestamp parsing**: Automatic detection of ISO 8601, syslog, Apache, and other common timestamp formats
 - **JSON awareness**: Detects JSON content in log lines and offers pretty-printing with syntax highlighting
 - **Pretty-print toggle**: Switch between compact and expanded JSON view, globally or per-line
-- **Interactive filtering**: Filter log lines by text pattern or JSON key-value pairs (include or exclude)
+- **Search**: Forward and backward search with regex and case-sensitive options, match highlighting
+- **Interactive filtering**: Filter log lines by text pattern, regex, or JSON key-value pairs (include or exclude)
 - **Filter management**: Reorder, toggle, delete, clear filters with a dedicated dialog
 - **Session management**: Save, load, rename, delete filter sessions with auto-save
 - **Live tailing**: Follow growing log files in real-time with pause/resume
+- **Theme support**: Toggle between dark and light themes with persistent preference
 - **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events
 
 ## Installation
@@ -94,6 +96,15 @@ AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or 
 
 ## Keybindings
 
+### Search
+
+| Key | Action                                                |
+| --- | ----------------------------------------------------- |
+| /   | Search forward (opens dialog with regex/case options) |
+| ?   | Search backward                                       |
+| n   | Next match                                            |
+| N   | Previous match                                        |
+
 ### Navigation
 
 | Key         | Action                    |
@@ -110,18 +121,18 @@ AWS credentials via `--profile`, `--aws-region`, `--aws-access-key-id`, etc. or 
 | ----- | ------------------------------------------------- |
 | j     | Toggle pretty-print for ALL JSON lines            |
 | Enter | Toggle pretty-print for the current line (sticky) |
-| n     | Toggle line numbers                               |
+| #     | Toggle line numbers                               |
 
 ### Filtering
 
 | Key | Action                                          |
 | --- | ----------------------------------------------- |
-| /   | Filter in (text or key=value)                   |
-| \   | Filter out (text or key=value)                  |
+| f   | Filter in (text, key=value, or regex)           |
+| F   | Filter out (text, key=value, or regex)          |
 | m   | Manage filters (toggle, delete, clear, reorder) |
 | 1-9 | Toggle individual filters on/off                |
 
-On JSON lines, `/` and `\` show key-value suggestions.
+On JSON lines, `f` and `F` show key-value suggestions.
 
 ### Tailing
 
@@ -138,10 +149,11 @@ On JSON lines, `/` and `\` show key-value suggestions.
 
 ### General
 
-| Key  | Action           |
-| ---- | ---------------- |
-| h, ? | Show help screen |
-| q    | Quit             |
+| Key | Action                  |
+| --- | ----------------------- |
+| t   | Toggle dark/light theme |
+| h   | Show help screen        |
+| q   | Quit                    |
 
 ## Log Format
 
@@ -158,6 +170,10 @@ Lines without a recognized timestamp are displayed as-is.
 ## Sessions
 
 Filter sessions are stored in `~/.config/logdelve/sessions/` as TOML files. Filters are auto-saved on every change. Use `--session` to load a session on startup.
+
+## Configuration
+
+Theme preference is stored in `~/.config/logdelve/config.toml`. Toggle with `t` during use.
 
 ## Development
 
@@ -180,7 +196,25 @@ make lint        # ruff check
 make format      # ruff format
 make typecheck   # mypy
 make clean       # remove caches
+
+# Performance benchmark
+uv run python scripts/perf_test.py
 ```
+
+## Contributing
+
+1. Fork the repo and create a feature branch
+2. Install dependencies: `uv sync`
+3. Make your changes
+4. Run checks: `make test` (runs lint, format check, type check, and tests)
+5. Submit a pull request
+
+### Code style
+
+- Python 3.13+ with type hints (strict mypy)
+- Formatting and linting via [Ruff](https://github.com/astral-sh/ruff)
+- Pydantic models for data structures
+- Textual framework for the TUI
 
 ## Releasing
 

@@ -90,6 +90,8 @@ def _filter_to_dict(rule: FilterRule) -> dict[str, Any]:
         "filter_type": rule.filter_type.value,
         "pattern": rule.pattern,
         "enabled": rule.enabled,
+        "is_regex": rule.is_regex,
+        "case_sensitive": rule.case_sensitive,
         "is_json_key": rule.is_json_key,
     }
     if rule.json_key is not None:
@@ -104,6 +106,8 @@ def _dict_to_filter(d: dict[str, Any]) -> FilterRule:
         filter_type=d["filter_type"],
         pattern=d.get("pattern", ""),
         enabled=d.get("enabled", True),
+        is_regex=d.get("is_regex", False),
+        case_sensitive=d.get("case_sensitive", False),
         is_json_key=d.get("is_json_key", False),
         json_key=d.get("json_key"),
         json_value=d.get("json_value"),

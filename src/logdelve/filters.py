@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from logdelve.models import FilterRule, FilterType, LogLine
@@ -51,7 +52,20 @@ def _matches(line: LogLine, rule: FilterRule) -> bool:
     """Check if a line matches a filter rule."""
     if rule.is_json_key:
         return _matches_json_key(line, rule)
+    if rule.is_regex:
+        return _matches_regex(line, rule)
+    if rule.case_sensitive:
+        return rule.pattern in line.raw
     return rule.pattern.lower() in line.raw.lower()
+
+
+def _matches_regex(line: LogLine, rule: FilterRule) -> bool:
+    """Check if a line matches a regex filter rule."""
+    try:
+        flags = 0 if rule.case_sensitive else re.IGNORECASE
+        return re.search(rule.pattern, line.raw, flags) is not None
+    except re.error:
+        return False
 
 
 def _matches_json_key(line: LogLine, rule: FilterRule) -> bool:

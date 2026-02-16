@@ -12,7 +12,8 @@ from textual.binding import Binding, BindingType
 from textual.widgets import Footer
 from textual.worker import get_current_worker
 
-from logdelve.models import ContentType, FilterRule, FilterType, LogLine
+from logdelve.config import load_config, save_config
+from logdelve.models import ContentType, FilterRule, FilterType, LogLine, SearchDirection, SearchQuery
 from logdelve.reader import read_file_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
@@ -20,25 +21,29 @@ from logdelve.widgets.filter_dialog import FilterDialog
 from logdelve.widgets.filter_manage_dialog import FilterManageDialog
 from logdelve.widgets.help_screen import HelpScreen
 from logdelve.widgets.log_view import LogView
+from logdelve.widgets.search_dialog import SearchDialog
 from logdelve.widgets.session_dialog import SessionAction, SessionManageDialog
 from logdelve.widgets.status_bar import StatusBar
+from logdelve.widgets.theme_dialog import ThemeDialog
 
 
-class LogSiftApp(App[None]):
+class LogDelveApp(App[None]):
     """Log viewer TUI application."""
 
     CSS_PATH = "styles/app.tcss"
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("slash", "filter_in", "Filter in"),
-        Binding("backslash", "filter_out", "Filter out"),
-        Binding("m", "manage_filters", "Manage filters"),
+        Binding("slash", "search_forward", "Search"),
+        Binding("question_mark", "search_backward", "Search back"),
+        Binding("f", "filter_in", "Filter in"),
+        Binding("F", "filter_out", "Filter out"),
+        Binding("m", "manage_filters", "Filters"),
         Binding("s", "manage_sessions", "Sessions"),
+        Binding("t", "toggle_theme", "Theme"),
         Binding("q", "quit", "Quit", show=False),
         Binding("p", "toggle_tail_pause", "Pause"),
-        Binding("question_mark", "show_help", "Help"),
-        Binding("h", "show_help", "Help", show=False),
+        Binding("h", "show_help", "Help"),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
         Binding("3", "toggle_filter(3)", "Toggle 3", show=False),
@@ -69,6 +74,9 @@ class LogSiftApp(App[None]):
         self._pipe_fd = pipe_fd
         self._tail_paused: bool = False
         self._tail_buffer: list[LogLine] = []
+        self._last_search: SearchQuery | None = None
+        self._config = load_config()
+        self.theme = self._config.theme
 
     @property
     def _is_streaming(self) -> bool:
@@ -148,6 +156,17 @@ class LogSiftApp(App[None]):
         else:
             status_bar.update_counts(log_view.total_count)
 
+    def _update_search_status(self) -> None:
+        """Update status bar with current search match info."""
+        log_view = self.query_one("#log-view", LogView)
+        status_bar = self.query_one("#status-bar", StatusBar)
+        if log_view.search_match_count > 0:
+            status_bar.set_search_info(log_view.search_current_index + 1, log_view.search_match_count)
+        elif log_view.has_search:
+            status_bar.set_search_info(0, 0)
+        else:
+            status_bar.clear_search_info()
+
     def _apply_filters(self) -> None:
         log_view = self.query_one("#log-view", LogView)
         filter_bar = self.query_one("#filter-bar", FilterBar)
@@ -177,6 +196,22 @@ class LogSiftApp(App[None]):
         if line.content_type == ContentType.JSON and line.parsed_json is not None:
             return line.parsed_json
         return None
+
+    # --- Search actions ---
+
+    def action_search_forward(self) -> None:
+        self.push_screen(SearchDialog(SearchDirection.FORWARD), callback=self._on_search_result)
+
+    def action_search_backward(self) -> None:
+        self.push_screen(SearchDialog(SearchDirection.BACKWARD), callback=self._on_search_result)
+
+    def _on_search_result(self, result: SearchQuery | None) -> None:
+        if result is None:
+            return
+        self._last_search = result
+        log_view = self.query_one("#log-view", LogView)
+        log_view.set_search(result)
+        self._update_search_status()
 
     # --- Filter actions ---
 
@@ -235,6 +270,19 @@ class LogSiftApp(App[None]):
             session = create_session(result.name, self._filter_rules)
             save_session(session)
             self.notify(f"Session '{result.name}' saved")
+
+    # --- Theme ---
+
+    def action_toggle_theme(self) -> None:
+        """Open theme selection dialog."""
+        self.push_screen(ThemeDialog(self.theme), callback=self._on_theme_result)
+
+    def _on_theme_result(self, result: str | None) -> None:
+        if result is None:
+            return
+        self.theme = result
+        self._config.theme = result
+        save_config(self._config)
 
     # --- Help ---
 

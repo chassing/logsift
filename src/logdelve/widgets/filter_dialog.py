@@ -6,9 +6,10 @@ from typing import Any, ClassVar
 
 from textual.app import ComposeResult
 from textual.binding import BindingType
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
+from textual.events import Key
 from textual.screen import ModalScreen
-from textual.widgets import Input, Label, OptionList
+from textual.widgets import Checkbox, Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from logdelve.filters import flatten_json
@@ -18,7 +19,7 @@ from logdelve.models import FilterRule, FilterType
 class FilterDialog(ModalScreen[FilterRule | None]):
     """Modal dialog for entering a filter pattern.
 
-    Supports text patterns and key=value syntax for JSON key filters.
+    Supports text patterns, key=value syntax for JSON key filters, and regex.
     When json_data is provided, shows clickable key-value suggestions.
     """
 
@@ -49,6 +50,15 @@ class FilterDialog(ModalScreen[FilterRule | None]):
     FilterDialog > Vertical > Input {
         width: 100%;
         margin-top: 1;
+    }
+
+    FilterDialog > Vertical > Horizontal {
+        height: auto;
+        margin-top: 1;
+    }
+
+    FilterDialog > Vertical > Horizontal > Checkbox {
+        margin-right: 3;
     }
 
     FilterDialog > Vertical > .hint {
@@ -83,7 +93,10 @@ class FilterDialog(ModalScreen[FilterRule | None]):
                 placeholder="text pattern or key=value...",
                 id="filter-input",
             )
-            yield Label("Enter to apply, Escape to cancel", classes="hint")
+            with Horizontal():
+                yield Checkbox("Case sensitive", id="case-sensitive")
+                yield Checkbox("Regex", id="regex")
+            yield Label("Enter to apply, Space to toggle options, Escape to cancel", classes="hint")
 
     def on_mount(self) -> None:
         try:
@@ -92,6 +105,13 @@ class FilterDialog(ModalScreen[FilterRule | None]):
                 ol.highlighted = 0
         except Exception:
             pass
+
+    def on_key(self, event: Key) -> None:
+        """Intercept Enter on checkboxes to submit the filter instead of toggling."""
+        if event.key == "enter" and isinstance(self.focused, Checkbox):
+            event.prevent_default()
+            event.stop()
+            self._submit_filter()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_index < len(self._pairs):
@@ -106,13 +126,20 @@ class FilterDialog(ModalScreen[FilterRule | None]):
             self.dismiss(rule)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        pattern = event.value.strip()
+        self._submit_filter()
+
+    def _submit_filter(self) -> None:
+        """Submit the filter with current input and options."""
+        pattern = self.query_one("#filter-input", Input).value.strip()
         if not pattern:
             self.dismiss(None)
             return
 
-        # key=value -> JSON key filter
-        if "=" in pattern:
+        is_regex = self.query_one("#regex", Checkbox).value
+        case_sensitive = self.query_one("#case-sensitive", Checkbox).value
+
+        # key=value -> JSON key filter (only when not regex)
+        if not is_regex and "=" in pattern:
             key, _, value = pattern.partition("=")
             key = key.strip()
             value = value.strip()
@@ -128,8 +155,15 @@ class FilterDialog(ModalScreen[FilterRule | None]):
                 )
                 return
 
-        # Plain text filter
-        self.dismiss(FilterRule(filter_type=self._filter_type, pattern=pattern))
+        # Text or regex filter
+        self.dismiss(
+            FilterRule(
+                filter_type=self._filter_type,
+                pattern=pattern,
+                is_regex=is_regex,
+                case_sensitive=case_sensitive,
+            )
+        )
 
     def action_cancel(self) -> None:
         self.dismiss(None)

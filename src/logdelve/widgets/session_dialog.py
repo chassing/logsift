@@ -62,7 +62,6 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "cancel", "Close"),
-        Binding("enter", "load_session", "Load"),
         Binding("d", "delete_session", "Delete"),
         Binding("r", "rename_session", "Rename"),
     ]
@@ -108,7 +107,8 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
         option = ol.get_option_at_index(ol.highlighted)
         return str(option.id) if option.id and not str(option.id).startswith("(") else None
 
-    def action_load_session(self) -> None:
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Load a session when Enter is pressed on the OptionList."""
         if self._renaming:
             return
         name = self._get_selected_name()

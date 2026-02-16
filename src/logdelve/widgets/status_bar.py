@@ -7,13 +7,13 @@ from textual.widget import Widget
 
 
 class StatusBar(Widget):
-    """Bottom status bar showing line counts and source info."""
+    """Bottom status bar showing line counts, search info, and source."""
 
     DEFAULT_CSS = """
     StatusBar {
         height: 1;
-        background: #264f78;
-        color: #ffffff;
+        background: $primary;
+        color: $text;
         padding: 0 1;
     }
     """
@@ -25,6 +25,8 @@ class StatusBar(Widget):
         self._source = source
         self._tailing: bool = False
         self._new_lines: int = 0
+        self._search_current: int | None = None
+        self._search_total: int | None = None
 
     def update_counts(self, total: int, filtered: int | None = None) -> None:
         """Update the line counts."""
@@ -42,6 +44,18 @@ class StatusBar(Widget):
         self._new_lines = count
         self.refresh()
 
+    def set_search_info(self, current: int, total: int) -> None:
+        """Set search match info."""
+        self._search_current = current
+        self._search_total = total
+        self.refresh()
+
+    def clear_search_info(self) -> None:
+        """Clear search info from status bar."""
+        self._search_current = None
+        self._search_total = None
+        self.refresh()
+
     def render(self) -> Text:
         text = Text()
 
@@ -56,6 +70,12 @@ class StatusBar(Widget):
 
         if self._new_lines > 0:
             text.append(f"  +{self._new_lines} new", style="bold")
+
+        if self._search_total is not None:
+            if self._search_total == 0:
+                text.append("  No matches", style="bold italic")
+            else:
+                text.append(f"  [{self._search_current}/{self._search_total}]", style="bold")
 
         right_part = self._source
         if right_part:

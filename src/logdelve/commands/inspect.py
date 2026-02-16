@@ -52,9 +52,9 @@ def inspect(
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
 
-    from logdelve.app import LogSiftApp
+    from logdelve.app import LogDelveApp
 
-    log_app = LogSiftApp(
+    log_app = LogDelveApp(
         lines=lines,
         source=source,
         session_name=session,

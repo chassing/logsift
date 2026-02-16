@@ -14,7 +14,8 @@ from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
 from logdelve.filters import apply_filters, check_line
-from logdelve.models import ContentType, FilterRule, LogLine
+from logdelve.models import ContentType, FilterRule, LogLine, SearchDirection, SearchQuery
+from logdelve.search import find_matches
 from logdelve.widgets.log_line import get_line_height, render_json_expanded
 
 
@@ -28,8 +29,8 @@ class LogView(ScrollView, can_focus=True):
     }
 
     LogView > .logview--highlight {
-        background: #264f78;
-        color: #ffffff;
+        background: $primary-darken-2;
+        color: $text;
     }
 
     LogView > .logview--timestamp {
@@ -47,6 +48,16 @@ class LogView(ScrollView, can_focus=True):
     LogView > .logview--line-number {
         color: $text-disabled;
     }
+
+    LogView > .logview--search-match {
+        background: #6e5600;
+        color: #ffffff;
+    }
+
+    LogView > .logview--search-current {
+        background: #9e7c00;
+        color: #ffffff;
+    }
     """
 
     COMPONENT_CLASSES: ClassVar[set[str]] = {
@@ -55,6 +66,8 @@ class LogView(ScrollView, can_focus=True):
         "logview--json",
         "logview--text",
         "logview--line-number",
+        "logview--search-match",
+        "logview--search-current",
     }
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -68,7 +81,9 @@ class LogView(ScrollView, can_focus=True):
         Binding("G", "scroll_end", "Bottom", show=False),
         Binding("j", "toggle_json_global", "JSON"),
         Binding("enter", "toggle_json_line", "Expand", show=False),
-        Binding("n", "toggle_line_numbers", "Lines#"),
+        Binding("#", "toggle_line_numbers", "Lines#"),
+        Binding("n", "next_match", "Next", show=False),
+        Binding("N", "prev_match", "Prev", show=False),
     ]
 
     cursor_line: reactive[int] = reactive(0)
@@ -88,6 +103,12 @@ class LogView(ScrollView, can_focus=True):
         # Height tracking for variable-height lines
         self._heights: list[int] = []
         self._offsets: list[int] = []
+        # Search state
+        self._search_query: SearchQuery | None = None
+        self._search_matches: list[tuple[int, int, int]] = []
+        self._search_current: int = -1
+        # Pre-computed: matches grouped by visible line index for fast render lookup
+        self._search_matches_by_line: dict[int, list[tuple[int, int]]] = {}
 
     @property
     def _lines(self) -> list[LogLine]:
@@ -108,6 +129,18 @@ class LogView(ScrollView, can_focus=True):
     def has_filters(self) -> bool:
         return bool(self._filter_rules)
 
+    @property
+    def has_search(self) -> bool:
+        return self._search_query is not None
+
+    @property
+    def search_match_count(self) -> int:
+        return len(self._search_matches)
+
+    @property
+    def search_current_index(self) -> int:
+        return self._search_current
+
     def on_mount(self) -> None:
         self._apply_filters()
 
@@ -119,6 +152,7 @@ class LogView(ScrollView, can_focus=True):
         self._sticky_expand = False
         self._filter_rules.clear()
         self.cursor_line = 0
+        self.clear_search()
         self._apply_filters()
 
     def set_filters(self, rules: list[FilterRule]) -> None:
@@ -132,6 +166,9 @@ class LogView(ScrollView, can_focus=True):
             self.cursor_line = min(old_cursor, len(visible) - 1)
         else:
             self.cursor_line = 0
+        # Re-run search on filtered lines
+        if self._search_query:
+            self._compute_search_matches()
         self.refresh()
 
     def append_line(self, line: LogLine) -> None:
@@ -225,6 +262,109 @@ class LogView(ScrollView, can_focus=True):
     def line_count(self) -> int:
         return len(self._lines)
 
+    # --- Search ---
+
+    def set_search(self, query: SearchQuery) -> None:
+        """Set a search query and find all matches."""
+        self._search_query = query
+        self._compute_search_matches()
+        # Jump to first match from current cursor position
+        if self._search_matches:
+            self._jump_to_nearest_match()
+        self.refresh()
+
+    def clear_search(self) -> None:
+        """Clear the current search."""
+        self._search_query = None
+        self._search_matches = []
+        self._search_current = -1
+        self._search_matches_by_line = {}
+        self.refresh()
+
+    def _compute_search_matches(self) -> None:
+        """Compute all search matches for visible lines."""
+        if not self._search_query:
+            self._search_matches = []
+            self._search_current = -1
+            self._search_matches_by_line = {}
+            return
+        visible = self._lines
+        self._search_matches = find_matches(visible, self._search_query)
+        self._search_current = -1
+        # Group by line index for efficient rendering
+        self._search_matches_by_line = {}
+        for _i, (line_idx, start, end) in enumerate(self._search_matches):
+            self._search_matches_by_line.setdefault(line_idx, []).append((start, end))
+
+    def _jump_to_nearest_match(self) -> None:
+        """Jump to the nearest match from the current cursor position."""
+        if not self._search_matches:
+            return
+        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        if direction == SearchDirection.FORWARD:
+            # Find first match at or after cursor
+            for i, (line_idx, _, _) in enumerate(self._search_matches):
+                if line_idx >= self.cursor_line:
+                    self._search_current = i
+                    self.cursor_line = line_idx
+                    return
+            # Wrap around
+            self._search_current = 0
+            self.cursor_line = self._search_matches[0][0]
+        else:
+            # Find first match at or before cursor
+            for i in range(len(self._search_matches) - 1, -1, -1):
+                line_idx = self._search_matches[i][0]
+                if line_idx <= self.cursor_line:
+                    self._search_current = i
+                    self.cursor_line = line_idx
+                    return
+            # Wrap around
+            self._search_current = len(self._search_matches) - 1
+            self.cursor_line = self._search_matches[-1][0]
+
+    def action_next_match(self) -> None:
+        """Go to the next search match."""
+        if not self._search_matches:
+            return
+        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        if direction == SearchDirection.FORWARD:
+            self._search_current = (self._search_current + 1) % len(self._search_matches)
+        else:
+            self._search_current = (self._search_current - 1) % len(self._search_matches)
+        self.cursor_line = self._search_matches[self._search_current][0]
+        # Update search status in app
+        try:
+            from logdelve.app import LogDelveApp
+
+            app = self.app
+            if isinstance(app, LogDelveApp):
+                app._update_search_status()
+        except Exception:
+            pass
+
+    def action_prev_match(self) -> None:
+        """Go to the previous search match."""
+        if not self._search_matches:
+            return
+        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        if direction == SearchDirection.FORWARD:
+            self._search_current = (self._search_current - 1) % len(self._search_matches)
+        else:
+            self._search_current = (self._search_current + 1) % len(self._search_matches)
+        self.cursor_line = self._search_matches[self._search_current][0]
+        # Update search status in app
+        try:
+            from logdelve.app import LogDelveApp
+
+            app = self.app
+            if isinstance(app, LogDelveApp):
+                app._update_search_status()
+        except Exception:
+            pass
+
+    # --- Rendering ---
+
     def render_line(self, y: int) -> Strip:
         scroll_x, scroll_y = self.scroll_offset
         display_row = scroll_y + y
@@ -250,13 +390,36 @@ class LogView(ScrollView, can_focus=True):
         lineno_style = self.get_component_rich_style("logview--line-number")
         bg_style = highlight_style if is_highlighted else Style()
 
+        # Get search matches for this line
+        line_matches = self._search_matches_by_line.get(line_index)
+        current_match_offsets: tuple[int, int] | None = None
+        if self._search_current >= 0 and self._search_current < len(self._search_matches):
+            cm = self._search_matches[self._search_current]
+            if cm[0] == line_index:
+                current_match_offsets = (cm[1], cm[2])
+
         if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
             strips = render_json_expanded(
                 line, content_width, lineno_style, timestamp_style, bg_style, self._show_line_numbers
             )
             strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
         else:
-            segments = self._render_compact_line(line, lineno_style, timestamp_style, json_style, text_style, bg_style)
+            search_match_style = self.get_component_rich_style("logview--search-match") if line_matches else None
+            search_current_style = (
+                self.get_component_rich_style("logview--search-current") if current_match_offsets else None
+            )
+            segments = self._render_compact_line(
+                line,
+                lineno_style,
+                timestamp_style,
+                json_style,
+                text_style,
+                bg_style,
+                line_matches,
+                search_match_style,
+                current_match_offsets,
+                search_current_style,
+            )
             strip = Strip(segments)
 
         strip = strip.crop(scroll_x, scroll_x + content_width)
@@ -277,8 +440,12 @@ class LogView(ScrollView, can_focus=True):
         json_style: Style,
         text_style: Style,
         bg_style: Style,
+        search_matches: list[tuple[int, int]] | None = None,
+        search_match_style: Style | None = None,
+        current_match: tuple[int, int] | None = None,
+        search_current_style: Style | None = None,
     ) -> list[Segment]:
-        """Render a single compact log line."""
+        """Render a single compact log line with optional search highlighting."""
         segments: list[Segment] = []
 
         if self._show_line_numbers:
@@ -290,14 +457,63 @@ class LogView(ScrollView, can_focus=True):
             ts_text = line.raw[:ts_end]
             segments.append(Segment(ts_text, timestamp_style + bg_style))
 
-        if line.content_type == ContentType.JSON:
-            segments.append(Segment(line.content, json_style + bg_style))
+        content_style = json_style if line.content_type == ContentType.JSON else text_style
+
+        if search_matches and search_match_style:
+            # Render content with search match highlighting
+            # Matches are in raw offsets; compute content offset
+            content_start = len(line.raw) - len(line.content) if line.timestamp else 0
+            content_text = line.content
+
+            # Collect match ranges that overlap with content portion
+            highlights: list[tuple[int, int, bool]] = []  # (start, end, is_current) relative to content
+            for m_start, m_end in search_matches:
+                # Convert from raw offset to content offset
+                cs = max(0, m_start - content_start)
+                ce = min(len(content_text), m_end - content_start)
+                if cs < ce:
+                    is_current = current_match is not None and m_start == current_match[0] and m_end == current_match[1]
+                    highlights.append((cs, ce, is_current))
+
+            if highlights:
+                segments.extend(
+                    self._split_with_highlights(
+                        content_text,
+                        highlights,
+                        content_style + bg_style,
+                        search_match_style,
+                        search_current_style or search_match_style,
+                    )
+                )
+            else:
+                segments.append(Segment(content_text, content_style + bg_style))
         else:
-            segments.append(Segment(line.content, text_style + bg_style))
+            segments.append(Segment(line.content, content_style + bg_style))
 
         if bg_style != Style():
             segments.append(Segment(" " * 10, bg_style))
 
+        return segments
+
+    @staticmethod
+    def _split_with_highlights(
+        text: str,
+        highlights: list[tuple[int, int, bool]],
+        normal_style: Style,
+        match_style: Style,
+        current_style: Style,
+    ) -> list[Segment]:
+        """Split text into segments with highlighted search matches."""
+        segments: list[Segment] = []
+        pos = 0
+        for start, end, is_current in sorted(highlights):
+            if pos < start:
+                segments.append(Segment(text[pos:start], normal_style))
+            style = current_style if is_current else match_style
+            segments.append(Segment(text[start:end], style))
+            pos = end
+        if pos < len(text):
+            segments.append(Segment(text[pos:], normal_style))
         return segments
 
     def watch_cursor_line(self, _old_value: int, _new_value: int) -> None:

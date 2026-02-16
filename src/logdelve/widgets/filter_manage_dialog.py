@@ -88,7 +88,12 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         text.append(f"{status} ", style=status_style)
 
         prefix = "+" if rule.filter_type == FilterType.INCLUDE else "-"
-        label = f"{rule.json_key}={rule.json_value}" if rule.is_json_key else rule.pattern
+        if rule.is_json_key:
+            label = f"{rule.json_key}={rule.json_value}"
+        elif rule.is_regex:
+            label = f"/{rule.pattern}/"
+        else:
+            label = rule.pattern
         style = "green" if rule.filter_type == FilterType.INCLUDE else "red"
         if not rule.enabled:
             style = "dim"
@@ -104,7 +109,9 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         idx = self._get_highlighted()
         if idx is not None and 0 <= idx < len(self._filters):
             self._filters[idx].enabled = not self._filters[idx].enabled
-            self._rebuild_list()
+            # Update only the changed option to preserve scroll position
+            ol = self.query_one("#filter-list", OptionList)
+            ol.replace_option_prompt_at_index(idx, self._format_rule(idx, self._filters[idx]))
 
     def action_delete_filter(self) -> None:
         idx = self._get_highlighted()

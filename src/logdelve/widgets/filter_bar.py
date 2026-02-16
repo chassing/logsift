@@ -58,6 +58,10 @@ class FilterBar(Widget):
         if parts:
             text.append(f"  [{', '.join(parts)}]", style="dim")
 
+        regex_count = sum(1 for r in self.filters if r.enabled and r.is_regex)
+        if regex_count:
+            text.append(f"  regex:{regex_count}", style="dim italic")
+
         text.append("  |  ", style="dim")
         text.append("m", style="bold")
         text.append(" Manage filters", style="dim")
