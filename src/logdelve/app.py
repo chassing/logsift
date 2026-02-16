@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -50,6 +51,8 @@ class LogDelveApp(App[None]):
         Binding("q", "quit", "Quit"),
         Binding("p", "toggle_tail_pause", "Tail pause", show=False),
         Binding("h", "show_help", "Help"),
+        Binding("ctrl+s", "save_screenshot_svg", "Screenshot", show=False),
+        Binding("ctrl+b", "next_demo_label", "Demo", show=False),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
         Binding("3", "toggle_filter(3)", "Toggle 3", show=False),
@@ -105,6 +108,11 @@ class LogDelveApp(App[None]):
     def on_mount(self) -> None:
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
+
+        if os.environ.get("LOGDELVE_DEMO"):
+            from logdelve.widgets.demo_overlay import setup_demo
+
+            setup_demo(self)
 
         if self._lines:
             log_view.set_lines(self._lines)
@@ -358,6 +366,10 @@ class LogDelveApp(App[None]):
         log_view = self.query_one("#log-view", LogView)
         log_view.toggle_anomaly_filter()
         self._update_status_bar()
+        if log_view._anomaly_filter:
+            self.notify("Showing anomalies only")
+        else:
+            self.notify("Showing all lines")
 
     # --- Analyze ---
 
@@ -404,6 +416,26 @@ class LogDelveApp(App[None]):
         self.theme = result
         self._config.theme = result
         save_config(self._config)
+
+    # --- Screenshot ---
+
+    def action_save_screenshot_svg(self) -> None:
+        """Save a screenshot as SVG to docs/screenshots/."""
+        from pathlib import Path
+
+        out_dir = Path("docs/screenshots")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
+        path = out_dir / f"logdelve-{ts}.svg"
+        self.save_screenshot(str(path))
+        self.notify(f"Screenshot saved: {path}")
+
+    # --- Demo labels ---
+
+    def action_next_demo_label(self) -> None:
+        """Show the next demo label (Ctrl+B). No-op without LOGDELVE_DEMO."""
+        if handler := getattr(self, "_demo_next_label", None):
+            handler()
 
     # --- Help ---
 

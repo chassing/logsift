@@ -18,34 +18,41 @@
 
 A terminal UI tool for viewing, filtering, and analyzing log lines. Built for outage investigation — find the needle in the haystack across thousands of log lines from multi-component applications.
 
+<img src="docs/screenshots/hero.gif" alt="logdelve" width="1024">
+
 ## Features
 
-- **Log level detection**: Automatic extraction from JSON fields and text patterns, color-coded line backgrounds
-- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
-- **Anomaly detection**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
-- **Message analysis**: Group log messages by event pattern, analyze JSON field value distributions
-- **Search**: Forward/backward search with regex, case-sensitive options, and match highlighting
-- **Interactive filtering**: Filter by text, regex, JSON key-value, or log level
-- **Filter management**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
-- **Session management**: Save, load, rename, delete filter sessions with auto-save
-- **Live tailing**: Follow growing log files in real-time with pause/resume
-- **Flexible time parsing**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
-- **Theme support**: Choose from all built-in Textual themes with persistent preference
-- **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events with stream names
+- **[Log level detection](docs/guide.md#log-level-detection)**: Automatic extraction from JSON fields and text patterns, color-coded line backgrounds
+- **[Component detection](docs/guide.md#component-detection)**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
+- **[Anomaly detection](docs/guide.md#anomaly-detection)**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
+- **[Message analysis](docs/guide.md#message-analysis)**: Group log messages by event pattern, analyze JSON field value distributions
+- **[Search](docs/guide.md#search)**: Forward/backward search with regex, case-sensitive options, and match highlighting
+- **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, or log level
+- **[Filter management](docs/guide.md#filter-management)**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
+- **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete filter sessions with auto-save
+- **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
+- **[Flexible time parsing](docs/guide.md#time-parsing)**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
+- **[Themes](docs/guide.md#themes)**: Choose from all built-in Textual themes with persistent preference
+- **[AWS CloudWatch](docs/guide.md#aws-cloudwatch)**: Download and list CloudWatch log groups, streams, and events with stream names
+
+📖 **[Full User Guide](docs/guide.md)** — detailed documentation for all features with examples
 
 ## Installation
 
 Requires Python 3.13+.
 
 ```bash
-# Install with uv
+# Recommended: install with uv
 uv tool install logdelve
 
-# Or install with pip
-pip install logdelve
-
 # With AWS CloudWatch support
-pip install logdelve[aws]
+uv tool install logdelve[aws]
+
+# No uv? Install it first
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Alternative: pip
+pip install logdelve
 ```
 
 ## Quick Start
@@ -62,6 +69,32 @@ logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
 
 # Compare against a known-good baseline
 logdelve inspect --baseline yesterday.log today.log
+```
+
+## UI Layout
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ f filter-in  F filter-out  x filters off  │  a analyze  │  / search         │ ← Toolbar
+├──┬──┬────┬──────────┬───────────────────────────────────────────────────────┤
+│▌ │E │·1  │ 10:30:01 │ {"event": "Connection refused", "host": "10.0.1.5"}   │ ← Anomaly + Level + Component + Time + Content
+│  │I │·2  │ 10:30:02 │ {"event": "Request processed", "status": 200}         │
+│  │I │·1  │ 10:30:03 │ {"event": "Health check passed"}                      │
+│▌ │E │·1  │ 10:30:04 │ {"event": "Timeout after 5000ms", "path": "/api"}     │ ← Error background
+│  │D │·3  │ 10:30:05 │ {"event": "Cache hit", "key": "user:42"}              │ ← Debug (dim)
+│  │I │·2  │ 10:30:06 │ {"event": "Request processed", "status": 200}         │
+├──┴──┴────┴──────────┴───────────────────────────────────────────────────────┤
+│ 500 lines  E:12 W:3  A:2                                      app.log       │ ← Status bar
+├─────────────────────────────────────────────────────────────────────────────┤
+│ s Sessions  q Quit  h Help                                                  │ ← Footer
+└─────────────────────────────────────────────────────────────────────────────┘
+ ▲  ▲   ▲       ▲                            ▲
+ │  │   │       │                            │
+ │  │   │       │                            └─ Content (JSON or text)
+ │  │   │       └─ Compact timestamp (HH:MM:SS)
+ │  │   └─ Component tag (color-coded, c to cycle: tag/full/off)
+ │  └─ Log level badge (E=error, W=warn, I=info, D=debug)
+ └─ Anomaly marker (▌ = new pattern not in baseline)
 ```
 
 ## Use Cases
@@ -151,15 +184,15 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 
 ### Filtering
 
-| Key | Action                                                |
-| --- | ----------------------------------------------------- |
-| f   | Filter in (text, key=value, or regex)                 |
-| F   | Filter out (text, key=value, or regex)                |
-| e   | Cycle log level filter (ALL / ERROR / WARN / INFO)    |
-| !   | Toggle anomaly-only filter (with --baseline)          |
-| x   | Suspend/resume all filters (preserves cursor position)|
-| m   | Manage filters (toggle, edit, delete, clear, reorder) |
-| 1-9 | Toggle individual filters on/off                      |
+| Key | Action                                                 |
+| --- | ------------------------------------------------------ |
+| f   | Filter in (text, key=value, or regex)                  |
+| F   | Filter out (text, key=value, or regex)                 |
+| e   | Cycle log level filter (ALL / ERROR / WARN / INFO)     |
+| !   | Toggle anomaly-only filter (with --baseline)           |
+| x   | Suspend/resume all filters (preserves cursor position) |
+| m   | Manage filters (toggle, edit, delete, clear, reorder)  |
+| 1-9 | Toggle individual filters on/off                       |
 
 ### Analysis
 

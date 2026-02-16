@@ -1,4 +1,4 @@
-.PHONY: test lint format typecheck check clean
+.PHONY: test lint format typecheck check clean gifs
 
 test: check
 	uv run pytest
@@ -16,6 +16,16 @@ typecheck:
 	uv run mypy src/
 
 check: lint format-check typecheck
+
+TAPES := $(wildcard docs/tapes/*.tape)
+
+gifs: $(TAPES)
+	@mkdir -p docs/screenshots
+	@for tape in $(TAPES); do \
+		echo "Recording $$(basename $$tape .tape).gif..."; \
+		vhs $$tape; \
+	done
+	@echo "Done. GIFs in docs/screenshots/"
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
