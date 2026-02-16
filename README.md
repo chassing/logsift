@@ -156,16 +156,25 @@ uv sync
 # Run from source
 uv run logsift inspect sample.log
 
-# Run tests
-uv run pytest
+# Run all checks (lint, format, typecheck, tests)
+make test
 
-# Lint and format
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
-
-# Type check
-uv run mypy src/
+# Individual targets
+make lint        # ruff check
+make format      # ruff format
+make typecheck   # mypy
+make clean       # remove caches
 ```
+
+## Releasing
+
+1. Update version in `pyproject.toml`
+2. Update `CHANGELOG.md`
+3. Commit and push: `git commit -am "Release vX.Y.Z" && git push`
+4. Create a GitHub release: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "See CHANGELOG.md"`
+5. The `publish.yml` workflow builds and publishes to PyPI automatically
+
+Requires `PYPI_TOKEN` secret in the GitHub repo settings.
 
 ## License
 
