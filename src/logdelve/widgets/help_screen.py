@@ -51,7 +51,7 @@ HELP_TEXT = """\
   --session/-s                          Load session on startup (CLI)
 
 [bold]Theme[/bold]
-  t                                     Toggle dark/light theme
+  t                                     Select theme
 
 [bold]General[/bold]
   h                                     Show this help

@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-02-16
+
+### Added
+
+- **Search**: forward (`/`) and backward (`?`) search with match highlighting
+- **Search options**: case-sensitive and regex toggles in search dialog
+- **Search navigation**: `n` for next match, `N` for previous match, with wrap-around
+- **Search status**: match count `[x/y]` shown in status bar
+- **Regex filters**: regex checkbox in filter dialog, displayed as `/.../` in filter manager
+- **Case-sensitive filters**: case-sensitive checkbox in filter dialog
+- **Theme selection**: `t` opens dialog with all available Textual themes
+- **Theme persistence**: selected theme saved to `~/.config/logdelve/config.toml`
+- **Performance benchmark**: `scripts/perf_test.py` for measuring parse, filter, and search speed
+- **Contributing guide**: added to README
+- **SVG logo**: project logo in `docs/logo.svg`
+- **Additional badges**: CI, Ruff, mypy, PyPI downloads
+
+### Changed
+
+- **Filter keybindings**: `f` for filter-in, `F` for filter-out (was `/` and `\`)
+- **Line numbers**: `#` to toggle (was `n`)
+- **Help**: `h` only (was `h` and `?`)
+- **Enter on checkboxes**: submits the dialog instead of toggling (use Space to toggle)
+- **Session dialog**: Enter on OptionList now correctly loads the selected session
+- **Design tokens**: replaced hardcoded colors with Textual theme variables
+- **Renamed**: `LogSiftApp` → `LogDelveApp`
+
+### Fixed
+
+- Filter manage dialog no longer scrolls to bottom when toggling a filter
+
 ## [0.1.0] - 2026-02-16
 
 ### Added

@@ -29,7 +29,7 @@ A terminal UI tool for viewing and filtering log lines. Think of it as a lightwe
 - **Filter management**: Reorder, toggle, delete, clear filters with a dedicated dialog
 - **Session management**: Save, load, rename, delete filter sessions with auto-save
 - **Live tailing**: Follow growing log files in real-time with pause/resume
-- **Theme support**: Toggle between dark and light themes with persistent preference
+- **Theme support**: Choose from all built-in Textual themes with persistent preference
 - **AWS CloudWatch**: Download and list CloudWatch log groups, streams, and events
 
 ## Installation
@@ -151,7 +151,7 @@ On JSON lines, `f` and `F` show key-value suggestions.
 
 | Key | Action                  |
 | --- | ----------------------- |
-| t   | Toggle dark/light theme |
+| t   | Select theme            |
 | h   | Show help screen        |
 | q   | Quit                    |
 
@@ -173,7 +173,7 @@ Filter sessions are stored in `~/.config/logdelve/sessions/` as TOML files. Filt
 
 ## Configuration
 
-Theme preference is stored in `~/.config/logdelve/config.toml`. Toggle with `t` during use.
+Theme preference is stored in `~/.config/logdelve/config.toml`. Press `t` to open the theme selection dialog.
 
 ## Development
 
@@ -218,13 +218,15 @@ uv run python scripts/perf_test.py
 
 ## Releasing
 
-1. Update version in `pyproject.toml`
-2. Update `CHANGELOG.md`
-3. Commit and push: `git commit -am "Release vX.Y.Z" && git push`
-4. Create a GitHub release: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "See CHANGELOG.md"`
-5. The `publish.yml` workflow builds and publishes to PyPI automatically
+See `AGENT.md` for the full release checklist.
 
-Requires `PYPI_TOKEN` secret in the GitHub repo settings.
+```bash
+# After updating version + changelog + README:
+git push
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "See CHANGELOG.md"
+```
+
+The `publish.yml` workflow builds and publishes to PyPI automatically. Requires `PYPI_TOKEN` secret in the GitHub repo settings.
 
 ## License
 
