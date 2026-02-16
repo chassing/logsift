@@ -50,5 +50,13 @@ def parse_time(value: str) -> datetime:
         second = int(time_match.group(3) or 0)
         return datetime(today.year, today.month, today.day, hour, minute, second, tzinfo=UTC)
 
-    # ISO 8601
-    return datetime.fromisoformat(stripped)
+    # ISO 8601 (with lenient time parsing: "2026-02-13 7:58" → "2026-02-13 07:58")
+    # Pad single-digit hours: "2026-02-13 7:58" → "2026-02-13 07:58"
+    padded = re.sub(r"(\d{4}-\d{2}-\d{2}[T ])(\d):", r"\g<1>0\2:", stripped)
+    try:
+        return datetime.fromisoformat(padded)
+    except ValueError:
+        pass
+
+    msg = f"Cannot parse time: {value!r}"
+    raise ValueError(msg)

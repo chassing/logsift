@@ -31,10 +31,17 @@ def inspect(
     file: Annotated[Path | None, typer.Argument(help="Log file to view")] = None,
     session: Annotated[str | None, typer.Option("--session", "-s", help="Load a saved filter session")] = None,
     no_tail: Annotated[bool, typer.Option("--no-tail", help="Disable automatic tailing")] = False,
+    baseline: Annotated[
+        Path | None, typer.Option("--baseline", "-b", help="Baseline log file for anomaly detection")
+    ] = None,
 ) -> None:
     """View and filter log lines in a terminal UI."""
     if file is not None and not file.is_file():
         typer.echo(f"Error: {file} is not a file")
+        raise typer.Exit(1)
+
+    if baseline is not None and not baseline.is_file():
+        typer.echo(f"Error: baseline file {baseline} not found")
         raise typer.Exit(1)
 
     pipe = is_pipe() if file is None else False
@@ -61,5 +68,6 @@ def inspect(
         file_path=file,
         tail=tail if file is not None else False,
         pipe_fd=pipe_fd,
+        baseline_path=baseline,
     )
     log_app.run(mouse=False)

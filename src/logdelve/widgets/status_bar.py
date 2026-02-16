@@ -31,6 +31,7 @@ class StatusBar(Widget):
         self._search_total: int | None = None
         self._level_counts: dict[LogLevel, int] = {}
         self._min_level: LogLevel | None = None
+        self._anomaly_count: int = 0
 
     def update_counts(self, total: int, filtered: int | None = None) -> None:
         """Update the line counts."""
@@ -58,6 +59,11 @@ class StatusBar(Widget):
         """Set log level counts and current min level filter."""
         self._level_counts = counts
         self._min_level = min_level
+        self.refresh()
+
+    def set_anomaly_count(self, count: int) -> None:
+        """Set anomaly count."""
+        self._anomaly_count = count
         self.refresh()
 
     def clear_search_info(self) -> None:
@@ -103,6 +109,9 @@ class StatusBar(Widget):
                 text.append(f"  {' '.join(parts)}", style="bold")
             if self._min_level is not None:
                 text.append(f"  ≥{self._min_level.value.upper()}", style="italic")
+
+        if self._anomaly_count > 0:
+            text.append(f"  A:{self._anomaly_count}", style="bold red")
 
         right_part = self._source
         if right_part:

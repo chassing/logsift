@@ -12,9 +12,10 @@ from textual.binding import Binding, BindingType
 from textual.widgets import Footer
 from textual.worker import get_current_worker
 
+from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
 from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
-from logdelve.reader import read_file_async, read_pipe_async
+from logdelve.reader import read_file, read_file_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
 from logdelve.widgets.filter_dialog import FilterDialog
@@ -35,18 +36,19 @@ class LogDelveApp(App[None]):
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("s", "manage_sessions", "Sessions"),
+        Binding("x", "toggle_all_filters", "Filters off", show=False),
         Binding("slash", "search_forward", "Search", show=False),
         Binding("question_mark", "search_backward", "Search back", show=False),
-        Binding("f", "filter_in", "Filter in"),
-        Binding("F", "filter_out", "Filter out"),
-        Binding("s", "manage_sessions", "Sessions"),
-        Binding("a", "analyze", "Analyze"),
+        Binding("f", "filter_in", "Filter in", show=False),
+        Binding("F", "filter_out", "Filter out", show=False),
+        Binding("a", "analyze", "Analyze", show=False),
         Binding("m", "manage_filters", "Filters", show=False),
-        Binding("x", "toggle_all_filters", "Filters off", show=False),
         Binding("t", "toggle_theme", "Theme", show=False),
-        Binding("e", "cycle_level_filter", "Level"),
-        Binding("q", "quit", "Quit", show=False),
-        Binding("p", "toggle_tail_pause", "Pause"),
+        Binding("e", "cycle_level_filter", "Level", show=False),
+        Binding("exclamation_mark", "toggle_anomalies", "Anomalies", show=False),
+        Binding("q", "quit", "Quit"),
+        Binding("p", "toggle_tail_pause", "Tail pause", show=False),
         Binding("h", "show_help", "Help"),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
@@ -67,6 +69,7 @@ class LogDelveApp(App[None]):
         file_path: Path | None = None,
         tail: bool = False,
         pipe_fd: int | None = None,
+        baseline_path: Path | None = None,
     ) -> None:
         super().__init__()
         self._lines = lines or []
@@ -81,7 +84,11 @@ class LogDelveApp(App[None]):
         self._last_search: SearchQuery | None = None
         self._filters_suspended: bool = False
         self._suspended_rules: list[FilterRule] = []
+        self._suspended_level: LogLevel | None = None
+        self._suspended_anomaly: bool = False
         self._min_level: LogLevel | None = None
+        self._baseline_path = baseline_path
+        self._anomaly_result: AnomalyResult | None = None
         self._config = load_config()
         self.theme = self._config.theme
 
@@ -110,6 +117,19 @@ class LogDelveApp(App[None]):
                 self.notify(f"Session '{self._session_name}' loaded")
             except FileNotFoundError:
                 pass
+
+        # Baseline anomaly detection
+        if self._baseline_path and self._lines:
+            baseline_lines = read_file(self._baseline_path)
+            baseline = build_baseline(baseline_lines)
+            self._anomaly_result = detect_anomalies(self._lines, baseline)
+            log_view.set_anomaly_scores(self._anomaly_result.scores)
+            n = self._anomaly_result.anomaly_count
+            if n > 0:
+                log_view.toggle_anomaly_filter()
+                self.notify(f"{n} anomalies detected — showing anomalies only (! to toggle)")
+            else:
+                self.notify("No anomalies found")
 
         if self._tail and self._file_path:
             status_bar.set_tailing(True)
@@ -158,11 +178,17 @@ class LogDelveApp(App[None]):
     def _update_status_bar(self) -> None:
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
+        filter_bar = self.query_one("#filter-bar", FilterBar)
         if log_view.has_filters:
             status_bar.update_counts(log_view.total_count, log_view.filtered_count)
         else:
             status_bar.update_counts(log_view.total_count)
-        status_bar.set_level_counts(log_view.level_counts, self._min_level)
+        level_counts = log_view.level_counts
+        status_bar.set_level_counts(level_counts, self._min_level)
+        filter_bar.set_level_info(self._min_level, has_levels=bool(level_counts))
+        if self._anomaly_result:
+            status_bar.set_anomaly_count(self._anomaly_result.anomaly_count)
+            filter_bar.set_anomaly_info(self._anomaly_result.anomaly_count, log_view._anomaly_filter)
 
     def _update_search_status(self) -> None:
         """Update status bar with current search match info."""
@@ -208,15 +234,21 @@ class LogDelveApp(App[None]):
     # --- Search actions ---
 
     def action_search_forward(self) -> None:
-        self.push_screen(SearchDialog(SearchDirection.FORWARD), callback=self._on_search_result)
+        self.push_screen(
+            SearchDialog(SearchDirection.FORWARD, last_query=self._last_search), callback=self._on_search_result
+        )
 
     def action_search_backward(self) -> None:
-        self.push_screen(SearchDialog(SearchDirection.BACKWARD), callback=self._on_search_result)
+        self.push_screen(
+            SearchDialog(SearchDirection.BACKWARD, last_query=self._last_search), callback=self._on_search_result
+        )
 
     def _on_search_result(self, result: SearchQuery | None) -> None:
         if result is None:
             return
         self._last_search = result
+        filter_bar = self.query_one("#filter-bar", FilterBar)
+        filter_bar.set_search_text(result.pattern)
         log_view = self.query_one("#log-view", LogView)
         log_view.set_search(result)
         self._update_search_status()
@@ -253,21 +285,41 @@ class LogDelveApp(App[None]):
             self._apply_filters()
 
     def action_toggle_all_filters(self) -> None:
-        """Suspend/resume all filters at once."""
+        """Suspend/resume ALL filters (rules, level, anomaly) preserving cursor line."""
+        log_view = self.query_one("#log-view", LogView)
+        orig_idx = log_view._cursor_orig_index()
+
         if self._filters_suspended:
-            # Restore
+            # Restore everything
             self._filter_rules = self._suspended_rules
             self._suspended_rules = []
+            self._min_level = self._suspended_level
+            self._suspended_level = None
+            log_view._anomaly_filter = self._suspended_anomaly
+            self._suspended_anomaly = False
             self._filters_suspended = False
+            log_view._min_level = self._min_level
             self._apply_filters()
+            log_view._restore_cursor(orig_idx)
             self.notify("Filters restored")
-        elif self._filter_rules:
-            # Suspend
+        else:
+            # Suspend everything
+            has_anything = bool(self._filter_rules) or self._min_level is not None or log_view._anomaly_filter
+            if not has_anything:
+                return
             self._suspended_rules = list(self._filter_rules)
+            self._suspended_level = self._min_level
+            self._suspended_anomaly = log_view._anomaly_filter
             self._filter_rules = []
+            self._min_level = None
+            log_view._anomaly_filter = False
             self._filters_suspended = True
+            log_view._min_level = None
             self._apply_filters()
-            self.notify("Filters suspended")
+            log_view._restore_cursor(orig_idx)
+            self.notify("All filters suspended")
+
+        self._update_status_bar()
 
     # --- Session actions ---
 
@@ -295,6 +347,17 @@ class LogDelveApp(App[None]):
             session = create_session(result.name, self._filter_rules)
             save_session(session)
             self.notify(f"Session '{result.name}' saved")
+
+    # --- Anomaly filter ---
+
+    def action_toggle_anomalies(self) -> None:
+        """Toggle showing only anomalous lines."""
+        if not self._anomaly_result or self._anomaly_result.anomaly_count == 0:
+            self.notify("No anomalies detected (use --baseline)", severity="warning")
+            return
+        log_view = self.query_one("#log-view", LogView)
+        log_view.toggle_anomaly_filter()
+        self._update_status_bar()
 
     # --- Analyze ---
 

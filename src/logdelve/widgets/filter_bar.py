@@ -1,4 +1,4 @@
-"""Compact filter status display bar."""
+"""Compact filter/toolbar bar at the top."""
 
 from __future__ import annotations
 
@@ -6,64 +6,110 @@ from rich.text import Text
 from textual.reactive import reactive
 from textual.widget import Widget
 
-from logdelve.models import FilterRule
+from logdelve.models import FilterRule, LogLevel
 
 
 class FilterBar(Widget):
-    """Compact bar showing filter count summary."""
+    """Always-visible toolbar showing shortcuts and active filter state."""
 
     DEFAULT_CSS = """
     FilterBar {
         height: 1;
         dock: top;
         background: $surface-darken-1;
-        display: none;
         padding: 0 1;
-    }
-
-    FilterBar.has-filters {
-        display: block;
     }
     """
 
     filters: reactive[list[FilterRule]] = reactive(list, always_update=True)
 
+    def __init__(self, id: str | None = None) -> None:
+        super().__init__(id=id)
+        self._min_level: LogLevel | None = None
+        self._has_levels: bool = False
+        self._anomaly_count: int = 0
+        self._anomaly_filter_active: bool = False
+        self._search_text: str | None = None
+
     def update_filters(self, rules: list[FilterRule]) -> None:
         """Update the displayed filters."""
         self.filters = list(rules)
-        if rules:
-            self.add_class("has-filters")
-        else:
-            self.remove_class("has-filters")
+
+    def set_level_info(self, min_level: LogLevel | None, has_levels: bool = False) -> None:
+        """Update level filter display."""
+        self._min_level = min_level
+        self._has_levels = has_levels
+        self.refresh()
+
+    def set_anomaly_info(self, count: int, filter_active: bool) -> None:
+        """Update anomaly detection display."""
+        self._anomaly_count = count
+        self._anomaly_filter_active = filter_active
+        self.refresh()
+
+    def set_search_text(self, pattern: str | None) -> None:
+        """Update active search display."""
+        self._search_text = pattern
+        self.refresh()
 
     def render(self) -> Text:
-        if not self.filters:
-            return Text()
-
-        total = len(self.filters)
-        active = sum(1 for r in self.filters if r.enabled)
-        includes = sum(1 for r in self.filters if r.enabled and r.filter_type.value == "include")
-        excludes = sum(1 for r in self.filters if r.enabled and r.filter_type.value == "exclude")
-
         text = Text()
-        text.append(f" {total} filters", style="bold")
-        if active < total:
-            text.append(f" ({active} active)", style="dim")
 
-        parts = []
-        if includes:
-            parts.append(f"+{includes}")
-        if excludes:
-            parts.append(f"-{excludes}")
-        if parts:
-            text.append(f"  [{', '.join(parts)}]", style="dim")
+        # Base shortcuts
+        text.append(" f", style="bold")
+        text.append(" filter-in", style="dim")
+        text.append("  F", style="bold")
+        text.append(" filter-out", style="dim")
+        # x toggle all filters
+        text.append("  x", style="bold")
+        text.append(" filters off", style="dim")
 
-        regex_count = sum(1 for r in self.filters if r.enabled and r.is_regex)
-        if regex_count:
-            text.append(f"  regex:{regex_count}", style="dim italic")
+        text.append("  │", style="dim")
+        text.append("  a", style="bold")
+        text.append(" analyze", style="dim")
 
-        text.append("  |  ", style="dim")
-        text.append("m", style="bold")
-        text.append(" Manage filters", style="dim")
+        # Search: show active search or shortcut
+        text.append("  │", style="dim")
+        text.append("  /", style="bold")
+        if self._search_text:
+            display = self._search_text[:10] + "…" if len(self._search_text) > 10 else self._search_text
+            text.append(f" {display}", style="bold cyan")
+            text.append("  n", style="bold")
+            text.append("/", style="dim")
+            text.append("N", style="bold")
+            text.append(" next/prev", style="dim")
+        else:
+            text.append(" search", style="dim")
+
+        # Level filter (show when levels detected)
+        if self._has_levels:
+            text.append("  │  ", style="dim")
+            text.append("e", style="bold")
+            if self._min_level is not None:
+                text.append(f" ≥{self._min_level.value.upper()}", style="bold yellow")
+            else:
+                text.append(" level-filter", style="dim")
+
+        # Anomaly info
+        if self._anomaly_count > 0:
+            text.append("  │  ", style="dim")
+            text.append("!", style="bold")
+            if self._anomaly_filter_active:
+                text.append(f" {self._anomaly_count} anomalies", style="bold red")
+            else:
+                text.append(f" {self._anomaly_count} anomalies", style="dim")
+
+        # Active filters
+        if self.filters:
+            text.append("  │  ", style="dim")
+            total = len(self.filters)
+            active = sum(1 for r in self.filters if r.enabled)
+            text.append(f"{total} filters", style="bold")
+            if active < total:
+                text.append(f" ({active})", style="dim")
+            text.append("  m", style="bold")
+            text.append(" manage", style="dim")
+            text.append("  1-9", style="bold")
+            text.append(" toggle", style="dim")
 
         return text

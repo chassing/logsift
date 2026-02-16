@@ -58,18 +58,22 @@ class SearchDialog(ModalScreen[SearchQuery | None]):
         Binding("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, direction: SearchDirection) -> None:
+    def __init__(self, direction: SearchDirection, last_query: SearchQuery | None = None) -> None:
         super().__init__()
         self._direction = direction
+        self._last_query = last_query
 
     def compose(self) -> ComposeResult:
         label = "🔍 Search forward (/)" if self._direction == SearchDirection.FORWARD else "🔍 Search backward (?)"
+        initial_value = self._last_query.pattern if self._last_query else ""
+        initial_case = self._last_query.case_sensitive if self._last_query else False
+        initial_regex = self._last_query.is_regex if self._last_query else False
         with Vertical():
             yield Label(label, classes="title")
-            yield Input(placeholder="search pattern...", id="search-input")
+            yield Input(value=initial_value, placeholder="search pattern...", id="search-input")
             with Horizontal():
-                yield Checkbox("Case sensitive", id="case-sensitive")
-                yield Checkbox("Regex", id="regex")
+                yield Checkbox("Case sensitive", initial_case, id="case-sensitive")
+                yield Checkbox("Regex", initial_regex, id="regex")
             yield Label("Enter to search, Space to toggle options, Escape to cancel", classes="hint")
 
     def on_key(self, event: Key) -> None:

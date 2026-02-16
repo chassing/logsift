@@ -113,10 +113,10 @@ class LogView(ScrollView, can_focus=True):
         Binding("end", "scroll_end", "End", show=False),
         Binding("g", "goto_top_or_prefix", "Top (gg)", show=False),
         Binding("G", "scroll_end", "Bottom", show=False),
-        Binding("j", "toggle_json_global", "JSON", show=False),
+        Binding("j", "toggle_json_global", "JSON"),
         Binding("enter", "toggle_json_line", "Expand", show=False),
-        Binding("#", "toggle_line_numbers", "Lines#", show=False),
-        Binding("c", "cycle_component_display", "Comp", show=False),
+        Binding("#", "toggle_line_numbers", "Lines#"),
+        Binding("c", "cycle_component_display", "Component"),
         Binding("n", "next_match", "Next", show=False),
         Binding("N", "prev_match", "Prev", show=False),
     ]
@@ -144,6 +144,9 @@ class LogView(ScrollView, can_focus=True):
         self._component_display: str = "tag"
         self._component_colors: dict[str, int] = {}
         self._component_index: dict[str, int] = {}
+        # Anomaly detection
+        self._anomaly_scores: dict[int, float] = {}
+        self._anomaly_filter: bool = False
         # Search state
         self._search_query: SearchQuery | None = None
         self._search_matches: list[tuple[int, int, int]] = []
@@ -168,7 +171,7 @@ class LogView(ScrollView, can_focus=True):
 
     @property
     def has_filters(self) -> bool:
-        return bool(self._filter_rules) or self._min_level is not None
+        return bool(self._filter_rules) or self._min_level is not None or self._anomaly_filter
 
     @property
     def level_counts(self) -> dict[LogLevel, int]:
@@ -178,6 +181,19 @@ class LogView(ScrollView, can_focus=True):
             if line.log_level is not None:
                 counts[line.log_level] = counts.get(line.log_level, 0) + 1
         return counts
+
+    def set_anomaly_scores(self, scores: dict[int, float]) -> None:
+        """Set anomaly scores from baseline comparison."""
+        self._anomaly_scores = scores
+        self.refresh()
+
+    def toggle_anomaly_filter(self) -> None:
+        """Toggle showing only anomalous lines."""
+        orig_idx = self._cursor_orig_index()
+        self._anomaly_filter = not self._anomaly_filter
+        self._apply_filters()
+        self._restore_cursor(orig_idx)
+        self.refresh()
 
     @property
     def has_search(self) -> bool:
@@ -205,17 +221,37 @@ class LogView(ScrollView, can_focus=True):
         self.clear_search()
         self._apply_filters()
 
+    def _cursor_orig_index(self) -> int | None:
+        """Get the original line index (in _all_lines) of the current cursor."""
+        if not self._filtered_indices:
+            return None
+        cursor = min(self.cursor_line, len(self._filtered_indices) - 1)
+        if cursor < 0:
+            return None
+        return self._filtered_indices[cursor]
+
+    def _restore_cursor(self, orig_idx: int | None) -> None:
+        """Restore cursor to the nearest visible line matching the original index and scroll to it."""
+        if orig_idx is None or not self._filtered_indices:
+            visible = self._lines
+            self.cursor_line = max(0, len(visible) - 1) if visible else 0
+        else:
+            # Find the closest visible line >= orig_idx
+            for new_idx, idx in enumerate(self._filtered_indices):
+                if idx >= orig_idx:
+                    self.cursor_line = new_idx
+                    break
+            else:
+                self.cursor_line = len(self._filtered_indices) - 1
+        # Defer centered scroll to after layout is updated
+        self.call_after_refresh(self._scroll_cursor_center)
+
     def set_filters(self, rules: list[FilterRule]) -> None:
         """Apply filter rules and refresh display."""
+        orig_idx = self._cursor_orig_index()
         self._filter_rules = list(rules)
-        old_cursor = self.cursor_line
         self._apply_filters()
-        # Keep cursor in bounds
-        visible = self._lines
-        if visible:
-            self.cursor_line = min(old_cursor, len(visible) - 1)
-        else:
-            self.cursor_line = 0
+        self._restore_cursor(orig_idx)
         # Re-run search on filtered lines
         if self._search_query:
             self._compute_search_matches()
@@ -266,14 +302,10 @@ class LogView(ScrollView, can_focus=True):
 
     def set_min_level(self, level: LogLevel | None) -> None:
         """Set minimum log level filter and refresh display."""
+        orig_idx = self._cursor_orig_index()
         self._min_level = level
-        old_cursor = self.cursor_line
         self._apply_filters()
-        visible = self._lines
-        if visible:
-            self.cursor_line = min(old_cursor, len(visible) - 1)
-        else:
-            self.cursor_line = 0
+        self._restore_cursor(orig_idx)
         if self._search_query:
             self._compute_search_matches()
         self.refresh()
@@ -293,6 +325,9 @@ class LogView(ScrollView, can_focus=True):
                 for i in self._filtered_indices
                 if self._passes_level_filter(self._all_lines[i].log_level, level_order, min_idx)
             ]
+        # Apply anomaly filter on top
+        if self._anomaly_filter and self._anomaly_scores:
+            self._filtered_indices = [i for i in self._filtered_indices if i in self._anomaly_scores]
         self._recompute_heights()
 
     def _is_expanded(self, line_index: int) -> bool:
@@ -494,6 +529,9 @@ class LogView(ScrollView, can_focus=True):
             search_current_style = (
                 self.get_component_rich_style("logview--search-current") if current_match_offsets else None
             )
+            # Check anomaly status using original line index
+            orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
+            is_anomaly = orig_idx in self._anomaly_scores
             segments = self._render_compact_line(
                 line,
                 lineno_style,
@@ -505,6 +543,7 @@ class LogView(ScrollView, can_focus=True):
                 search_match_style,
                 current_match_offsets,
                 search_current_style,
+                is_anomaly=is_anomaly,
             )
             strip = Strip(segments)
 
@@ -530,9 +569,16 @@ class LogView(ScrollView, can_focus=True):
         search_match_style: Style | None = None,
         current_match: tuple[int, int] | None = None,
         search_current_style: Style | None = None,
+        is_anomaly: bool = False,
     ) -> list[Segment]:
         """Render a single compact log line with optional search highlighting."""
         segments: list[Segment] = []
+
+        # Anomaly marker
+        if is_anomaly:
+            segments.append(Segment("▌", Style(color="red", bold=True)))
+        elif self._anomaly_scores:
+            segments.append(Segment(" ", bg_style))
 
         if self._show_line_numbers:
             lineno_text = f"{line.line_number:>6} "
@@ -636,8 +682,8 @@ class LogView(ScrollView, can_focus=True):
         self._scroll_cursor_into_view()
         self.refresh()
 
-    def _scroll_cursor_into_view(self) -> None:
-        """Ensure the cursor line is visible."""
+    def _scroll_cursor_into_view(self, center: bool = False) -> None:
+        """Ensure the cursor line is visible, optionally centering it."""
         visible = self._lines
         if not visible or not self._offsets:
             return
@@ -650,10 +696,18 @@ class LogView(ScrollView, can_focus=True):
         cursor_height = self._heights[cursor]
         scroll_y = self.scroll_offset.y
 
-        if cursor_start < scroll_y:
+        if center:
+            # Center the cursor line on screen
+            target_y = max(0, cursor_start - (region_height - cursor_height) // 2)
+            self.scroll_to(y=target_y, animate=False)
+        elif cursor_start < scroll_y:
             self.scroll_to(y=cursor_start, animate=False)
         elif cursor_start + cursor_height > scroll_y + region_height:
             self.scroll_to(y=cursor_start + cursor_height - region_height, animate=False)
+
+    def _scroll_cursor_center(self) -> None:
+        """Center the cursor line on screen (used after filter changes)."""
+        self._scroll_cursor_into_view(center=True)
 
     # --- Actions ---
 
