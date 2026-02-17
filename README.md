@@ -30,6 +30,7 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, component, or log level — tabbed dialog with multi-select
 - **[Filter management](docs/guide.md#filter-management)**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
 - **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete filter sessions with auto-save
+- **[Streaming large files](docs/guide.md#large-files)**: Chunked background loading for files up to 2-3GB with instant startup and progress display
 - **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
 - **[Flexible time parsing](docs/guide.md#time-parsing)**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
 - **[Themes](docs/guide.md#themes)**: Choose from all built-in Textual themes with persistent preference

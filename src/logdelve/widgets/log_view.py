@@ -316,6 +316,51 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         self.refresh()
 
+    def append_lines(self, lines: list[LogLine]) -> None:
+        """Append a batch of lines (for chunked loading). More efficient than per-line append."""
+        if not lines:
+            return
+
+        visible_before = len(self.lines)
+        cursor_was_on_last = self.cursor_line >= visible_before - 1
+
+        base_idx = len(self._all_lines)
+        self._all_lines.extend(lines)
+
+        # Incremental filter check for batch
+        new_visible: list[LogLine] = []
+        for i, line in enumerate(lines):
+            idx = base_idx + i
+            if self._filter_rules:
+                if check_line(line, self._filter_rules):
+                    self._filtered_indices.append(idx)
+                    new_visible.append(line)
+            else:
+                self._filtered_indices.append(idx)
+                new_visible.append(line)
+
+        if not new_visible:
+            return
+
+        # Batch-compute heights and offsets
+        max_width = self._max_width
+        for line in new_visible:
+            h = get_line_height(line, expanded=False)
+            self._heights.append(h)
+            offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
+            self._offsets.append(offset)
+            max_width = max(max_width, len(line.raw))
+
+        self._max_width = max_width
+        total_height = self._offsets[-1] + self._heights[-1] if self._offsets else 0
+        self.virtual_size = Size(self._max_width + 10, total_height)
+
+        if cursor_was_on_last:
+            self.cursor_line = len(self.lines) - 1
+            self._scroll_cursor_into_view()
+
+        self.refresh()
+
     def _is_at_bottom(self) -> bool:
         """Check if the view is scrolled to the bottom."""
         if not self._offsets:

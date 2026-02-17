@@ -22,6 +22,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [AWS CloudWatch](#aws-cloudwatch)
 - [Time Parsing](#time-parsing)
 - [Themes](#themes)
+- [Large Files](#large-files)
 - [Integration Patterns](#integration-patterns)
 - [Troubleshooting](#troubleshooting)
 - [Keyboard Reference](#keyboard-reference)
@@ -671,6 +672,24 @@ The selected theme is persisted in `~/.config/logdelve/config.toml` and restored
 
 ---
 
+## Large Files
+
+For files larger than 1MB, logdelve uses chunked background loading for fast startup:
+
+1. The first 10,000 lines are loaded synchronously — the TUI appears instantly
+2. Remaining lines are loaded in the background in chunks of 50,000
+3. The status bar shows loading progress (e.g., "Loading: 50K/~1.2M")
+4. Navigation, filtering, and search work immediately on loaded lines
+5. When loading completes, the progress indicator disappears
+
+This approach handles files up to 2-3GB. Files smaller than 1MB are loaded entirely before the TUI starts (no progress indicator).
+
+### Baseline with large files
+
+When using `--baseline` with a large file, anomaly detection runs after background loading completes. The baseline file itself is always loaded fully (it's typically a smaller reference file).
+
+---
+
 ## Integration Patterns
 
 logdelve's CloudWatch commands output to stdout, making them scriptable and composable with pipes.
@@ -751,7 +770,7 @@ Yes. Lines without a recognized timestamp are displayed as-is, without a level b
 Templates are compared, not exact lines. If only variable parts change (IPs, timestamps, UUIDs), the templates stay the same and won't be flagged. Anomalies are detected when entirely new message patterns appear or existing patterns spike >5x in frequency.
 
 **How large can a log file be?**
-logdelve uses virtual rendering — display performance is constant regardless of file size. Parsing is linear (all lines are parsed on load). For very large files, use `--no-tail` to skip automatic tailing.
+Files up to 2-3GB work well. For files >1MB, logdelve loads the first 10,000 lines instantly and continues loading the rest in the background. The status bar shows loading progress. Navigation, filtering, and search work immediately on the loaded portion. See [Large Files](#large-files).
 
 **The `!` key does nothing.**
 The anomaly filter requires `--baseline`. Without a baseline file, there are no anomalies to filter. Usage: `logdelve inspect --baseline good.log current.log`.

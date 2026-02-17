@@ -10,10 +10,12 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from logdelve.parsers import ParserName, detect_parser, get_parser
-from logdelve.reader import is_pipe, read_file
+from logdelve.reader import is_pipe, read_file, read_file_initial
 
 if TYPE_CHECKING:
     from logdelve.parsers import LogParser
+
+_CHUNKED_THRESHOLD = 1_000_000  # 1MB
 
 
 def _resolve_parser(parser_name: ParserName, file: Path | None) -> LogParser:
@@ -70,8 +72,16 @@ def inspect(
     pipe = is_pipe() if file is None else False
     pipe_fd: int | None = None
 
+    file_size: int | None = None
     if file is not None:
-        lines = [] if tail else read_file(file, parser=log_parser)
+        file_size = file.stat().st_size
+        if tail:
+            lines = []
+        elif file_size > _CHUNKED_THRESHOLD:
+            lines = read_file_initial(file, parser=log_parser)
+        else:
+            lines = read_file(file, parser=log_parser)
+            file_size = None  # signal: no background loading needed
         source = str(file)
     elif pipe:
         pipe_fd = _setup_pipe_input()
@@ -92,5 +102,6 @@ def inspect(
         pipe_fd=pipe_fd,
         baseline_path=baseline,
         parser=log_parser,
+        file_size=file_size,
     )
     log_app.run(mouse=False)

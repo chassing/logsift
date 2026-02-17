@@ -14,7 +14,7 @@ from textual.worker import get_current_worker
 from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
 from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
-from logdelve.reader import read_file, read_file_async, read_pipe_async
+from logdelve.reader import read_file, read_file_async, read_file_remaining_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
 from logdelve.widgets.filter_dialog import FilterDialog
@@ -80,6 +80,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         pipe_fd: int | None = None,
         baseline_path: Path | None = None,
         parser: LogParser | None = None,
+        file_size: int | None = None,
     ) -> None:
         super().__init__()
         self._lines = lines or []
@@ -102,6 +103,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._anomaly_result: AnomalyResult | None = None
         self._config = load_config()
         self.theme = self._config.theme
+        self._file_size = file_size
+        self._loading_complete: bool = file_size is None
 
     @property
     def _is_streaming(self) -> bool:
@@ -134,18 +137,9 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             except FileNotFoundError:
                 pass
 
-        # Baseline anomaly detection
-        if self._baseline_path and self._lines:
-            baseline_lines = read_file(self._baseline_path, parser=self._parser)
-            baseline = build_baseline(baseline_lines)
-            self._anomaly_result = detect_anomalies(self._lines, baseline)
-            log_view.set_anomaly_scores(self._anomaly_result.scores)
-            n = self._anomaly_result.anomaly_count
-            if n > 0:
-                log_view.toggle_anomaly_filter()
-                self.notify(f"{n} anomalies detected — showing anomalies only (! to toggle)")
-            else:
-                self.notify("No anomalies found")
+        # Baseline anomaly detection (only when all lines are loaded)
+        if self._baseline_path and self._lines and self._loading_complete:
+            self._run_baseline_detection()
 
         if self._tail and self._file_path:
             status_bar.set_tailing(tailing=True)
@@ -155,6 +149,12 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         elif self._pipe_fd is not None:
             status_bar.set_tailing(tailing=True)
             self.run_worker(self._tail_worker(read_pipe_async(self._pipe_fd, parser=self._parser)), exclusive=True)
+        elif self._file_path and not self._loading_complete:
+            # Chunked loading: start background worker for remaining lines
+            initial_count = len(self._lines)
+            estimated_total = self._estimate_total_lines(initial_count) if initial_count > 0 else None
+            status_bar.set_loading_progress(initial_count, estimated_total)
+            self.run_worker(self._loading_worker(initial_count, estimated_total), exclusive=True)
 
         self._update_status_bar()
 
@@ -172,6 +172,56 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             else:
                 log_view.append_line(line)
                 self._update_status_bar()
+
+    async def _loading_worker(self, initial_count: int, estimated_total: int | None) -> None:
+        """Load remaining file lines in background chunks."""
+        log_view = self.query_one("#log-view", LogView)
+        status_bar = self.query_one("#status-bar", StatusBar)
+        worker = get_current_worker()
+        loaded = initial_count
+        async for chunk in read_file_remaining_async(self._file_path, skip=initial_count, parser=self._parser):  # type: ignore[arg-type]
+            if worker.is_cancelled:
+                break
+            log_view.append_lines(chunk)
+            loaded += len(chunk)
+            status_bar.set_loading_progress(loaded, estimated_total)
+            self._update_status_bar()
+        # Loading complete
+        self._loading_complete = True
+        status_bar.clear_loading_progress()
+        self._update_status_bar()
+        if self._baseline_path:
+            self._run_baseline_detection()
+
+    def _estimate_total_lines(self, initial_count: int) -> int | None:
+        """Estimate total lines from file size and average line length of initial chunk."""
+        if not self._file_size or not self._lines:
+            return None
+        total_bytes_initial = sum(len(line.raw) + 1 for line in self._lines[:initial_count])
+        if total_bytes_initial == 0:
+            return None
+        avg_line_bytes = total_bytes_initial / initial_count
+        return int(self._file_size / avg_line_bytes)
+
+    def _run_baseline_detection(self) -> None:
+        """Run anomaly detection against the baseline file."""
+        if not self._baseline_path:
+            return
+        log_view = self.query_one("#log-view", LogView)
+        all_lines = log_view._all_lines  # noqa: SLF001
+        if not all_lines:
+            return
+        baseline_lines = read_file(self._baseline_path, parser=self._parser)
+        baseline = build_baseline(baseline_lines)
+        self._anomaly_result = detect_anomalies(all_lines, baseline)
+        log_view.set_anomaly_scores(self._anomaly_result.scores)
+        n = self._anomaly_result.anomaly_count
+        if n > 0:
+            log_view.toggle_anomaly_filter()
+            self.notify(f"{n} anomalies detected — showing anomalies only (! to toggle)")
+        else:
+            self.notify("No anomalies found")
+        self._update_status_bar()
 
     def action_toggle_tail_pause(self) -> None:
         """Toggle tail pause/resume."""

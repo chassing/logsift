@@ -7,6 +7,19 @@ from textual.widget import Widget
 
 from logdelve.models import LogLevel
 
+_MILLION = 1_000_000
+_TEN_THOUSAND = 10_000
+_THOUSAND = 1_000
+
+
+def _format_count(n: int) -> str:
+    """Format a line count compactly: 1234 → '1,234', 1234567 → '1.2M'."""
+    if n >= _MILLION:
+        return f"{n / _MILLION:.1f}M"
+    if n >= _TEN_THOUSAND:
+        return f"{n / _THOUSAND:.0f}K"
+    return f"{n:,}"
+
 
 class StatusBar(Widget):
     """Bottom status bar showing line counts, search info, and source."""
@@ -32,6 +45,8 @@ class StatusBar(Widget):
         self._level_counts: dict[LogLevel, int] = {}
         self._min_level: LogLevel | None = None
         self._anomaly_count: int = 0
+        self._loading_loaded: int | None = None
+        self._loading_total: int | None = None
 
     def update_counts(self, total: int, filtered: int | None = None) -> None:
         """Update the line counts."""
@@ -66,6 +81,18 @@ class StatusBar(Widget):
         self._anomaly_count = count
         self.refresh()
 
+    def set_loading_progress(self, loaded: int, total: int | None = None) -> None:
+        """Set loading progress (for chunked file loading)."""
+        self._loading_loaded = loaded
+        self._loading_total = total
+        self.refresh()
+
+    def clear_loading_progress(self) -> None:
+        """Clear loading progress indicator."""
+        self._loading_loaded = None
+        self._loading_total = None
+        self.refresh()
+
     def clear_search_info(self) -> None:
         """Clear search info from status bar."""
         self._search_current = None
@@ -83,6 +110,14 @@ class StatusBar(Widget):
             text.append(f"{self._filtered} of {self._total} lines")
         else:
             text.append(f"{self._total} lines")
+
+        if self._loading_loaded is not None:
+            loaded = _format_count(self._loading_loaded)
+            if self._loading_total is not None:
+                total = _format_count(self._loading_total)
+                text.append(f"  Loading: {loaded}/~{total}", style="bold italic")
+            else:
+                text.append(f"  Loading: {loaded}...", style="bold italic")
 
         if self._new_lines > 0:
             text.append(f"  +{self._new_lines} new", style="bold")

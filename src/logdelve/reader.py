@@ -33,6 +33,46 @@ def read_file(path: Path, parser: LogParser | None = None) -> list[LogLine]:
     return lines
 
 
+_INITIAL_CHUNK_SIZE = 10_000
+_BACKGROUND_CHUNK_SIZE = 50_000
+
+
+def read_file_initial(path: Path, parser: LogParser | None = None, count: int = _INITIAL_CHUNK_SIZE) -> list[LogLine]:
+    """Read the first `count` lines from a file (synchronous)."""
+    p = parser or _default_parser()
+    lines: list[LogLine] = []
+    with path.open(encoding="utf-8") as f:
+        for i, raw_line in enumerate(f, start=1):
+            lines.append(p.parse_line(i, raw_line.rstrip("\n")))
+            if i >= count:
+                break
+    return lines
+
+
+async def read_file_remaining_async(
+    path: Path,
+    *,
+    skip: int,
+    parser: LogParser | None = None,
+    chunk_size: int = _BACKGROUND_CHUNK_SIZE,
+) -> AsyncIterator[list[LogLine]]:
+    """Read remaining lines from a file in chunks, skipping the first `skip` lines."""
+    p = parser or _default_parser()
+    line_number = 0
+    chunk: list[LogLine] = []
+    async with aiofiles.open(path) as f:
+        async for raw_line in f:
+            line_number += 1
+            if line_number <= skip:
+                continue
+            chunk.append(p.parse_line(line_number, raw_line.rstrip("\n")))
+            if len(chunk) >= chunk_size:
+                yield chunk
+                chunk = []
+    if chunk:
+        yield chunk
+
+
 def is_pipe() -> bool:
     """Check if stdin is a pipe (not a terminal)."""
     return not sys.stdin.isatty()
