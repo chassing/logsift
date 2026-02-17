@@ -168,3 +168,109 @@ class TestJsonKeyFilters:
         ]
         result = apply_filters(JSON_LINES, rules)
         assert result == [1, 2]
+
+
+def _make_component_line(line_number: int, raw: str, component: str | None) -> LogLine:
+    return LogLine(
+        line_number=line_number,
+        raw=raw,
+        content_type=ContentType.TEXT,
+        content=raw,
+        component=component,
+    )
+
+
+COMPONENT_LINES = [
+    _make_component_line(1, "Starting api-server", "api-server"),
+    _make_component_line(2, "Starting auth-service", "auth-service"),
+    _make_component_line(3, "Health check ok", "api-server"),
+    _make_component_line(4, "Login failed", "auth-service"),
+    _make_component_line(5, "No component line", None),
+    _make_component_line(6, "Worker started", "worker"),
+]
+
+
+class TestComponentFilters:
+    def test_component_include(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:api-server",
+                is_component=True,
+                component_name="api-server",
+            )
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        assert result == [0, 2]
+
+    def test_component_exclude(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.EXCLUDE,
+                pattern="component:auth-service",
+                is_component=True,
+                component_name="auth-service",
+            )
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        assert result == [0, 2, 4, 5]
+
+    def test_component_include_no_match_on_none(self) -> None:
+        """Lines without a component don't match component include filters."""
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:api-server",
+                is_component=True,
+                component_name="api-server",
+            )
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        # Line 5 (no component) is excluded because it doesn't match any include
+        assert 4 not in result
+
+    def test_multiple_component_includes_or_logic(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:api-server",
+                is_component=True,
+                component_name="api-server",
+            ),
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:worker",
+                is_component=True,
+                component_name="worker",
+            ),
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        assert result == [0, 2, 5]
+
+    def test_component_filter_disabled(self) -> None:
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:api-server",
+                is_component=True,
+                component_name="api-server",
+                enabled=False,
+            )
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        assert result == [0, 1, 2, 3, 4, 5]
+
+    def test_component_with_text_filter(self) -> None:
+        """Component filter combined with text filter uses OR logic for includes."""
+        rules = [
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern="component:api-server",
+                is_component=True,
+                component_name="api-server",
+            ),
+            FilterRule(filter_type=FilterType.INCLUDE, pattern="Login"),
+        ]
+        result = apply_filters(COMPONENT_LINES, rules)
+        # api-server lines (0, 2) + "Login failed" line (3)
+        assert result == [0, 2, 3]

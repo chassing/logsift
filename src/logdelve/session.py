@@ -95,11 +95,14 @@ def _filter_to_dict(rule: FilterRule) -> dict[str, Any]:
         "is_regex": rule.is_regex,
         "case_sensitive": rule.case_sensitive,
         "is_json_key": rule.is_json_key,
+        "is_component": rule.is_component,
     }
     if rule.json_key is not None:
         d["json_key"] = rule.json_key
     if rule.json_value is not None:
         d["json_value"] = rule.json_value
+    if rule.component_name is not None:
+        d["component_name"] = rule.component_name
     return d
 
 
@@ -113,4 +116,6 @@ def _dict_to_filter(d: dict[str, Any]) -> FilterRule:
         is_json_key=d.get("is_json_key", False),
         json_key=d.get("json_key"),
         json_value=d.get("json_value"),
+        is_component=d.get("is_component", False),
+        component_name=d.get("component_name"),
     )

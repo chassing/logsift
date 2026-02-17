@@ -58,6 +58,8 @@ class FilterRule(BaseModel):
     is_json_key: bool = False
     json_key: str | None = None
     json_value: str | None = None
+    is_component: bool = False
+    component_name: str | None = None
 
 
 class SearchDirection(StrEnum):

@@ -50,6 +50,8 @@ def check_line(line: LogLine, rules: list[FilterRule]) -> bool:
 
 def _matches(line: LogLine, rule: FilterRule) -> bool:
     """Check if a line matches a filter rule."""
+    if rule.is_component:
+        return _matches_component(line, rule)
     if rule.is_json_key:
         return _matches_json_key(line, rule)
     if rule.is_regex:
@@ -57,6 +59,13 @@ def _matches(line: LogLine, rule: FilterRule) -> bool:
     if rule.case_sensitive:
         return rule.pattern in line.raw
     return rule.pattern.lower() in line.raw.lower()
+
+
+def _matches_component(line: LogLine, rule: FilterRule) -> bool:
+    """Check if a line's component matches a component filter rule."""
+    if line.component is None or rule.component_name is None:
+        return False
+    return line.component == rule.component_name
 
 
 def _matches_regex(line: LogLine, rule: FilterRule) -> bool:

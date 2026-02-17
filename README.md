@@ -27,7 +27,7 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[Anomaly detection](docs/guide.md#anomaly-detection)**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
 - **[Message analysis](docs/guide.md#message-analysis)**: Group log messages by event pattern, analyze JSON field value distributions
 - **[Search](docs/guide.md#search)**: Forward/backward search with regex, case-sensitive options, and match highlighting
-- **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, or log level
+- **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, component, or log level — tabbed dialog with multi-select
 - **[Filter management](docs/guide.md#filter-management)**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
 - **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete filter sessions with auto-save
 - **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
@@ -147,6 +147,7 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 
 # In the TUI:
 #    - Component tags (·1, ·2) identify pods — press 'c' to see full names
+#    - Press 'f'/'F' and switch to Component tab to filter by pod
 #    - Press 'e' to filter by log level (ERROR → WARN → INFO)
 #    - Press 'a' then 'm' to switch to field analysis mode
 #    - Select a field value to filter (e.g., http_status: 500)

@@ -234,6 +234,10 @@ Press `c` to cycle through display modes:
 
 Each unique component gets a deterministic color from a palette of 8 distinct colors.
 
+### Component filtering
+
+Press `f` or `F` and switch to the **Component** tab to filter by component. The tab shows all detected components with line counts. Select one or more components with Space, then press Enter to apply. Components create standard filter rules that can be managed, toggled, and persisted like any other filter.
+
 ### Component prefix stripping
 
 When a component prefix like `[pod-name]` is detected, it's stripped before timestamp parsing. This means CloudWatch output with `[stream-name]` prefixes works correctly:
@@ -366,16 +370,23 @@ The toolbar shows the active search text: `/ connection…` in cyan, with `n/N n
 | `f` | Filter in — show only matching lines |
 | `F` | Filter out — hide matching lines     |
 
-The filter dialog supports:
+The filter dialog uses a **tabbed interface**:
+
+**Text tab** (default):
 
 - **Text pattern**: simple substring match
 - **key=value**: JSON key-value filter (auto-detected when pattern contains `=`)
 - **Regex**: toggle the regex checkbox
 - **Case sensitive**: toggle the case-sensitive checkbox
+- On JSON lines, shows a multi-select list of key-value suggestions from the current line
 
-### JSON key suggestions
+**Component tab** (when components are detected):
 
-On JSON lines, pressing `f` or `F` shows clickable key-value suggestions from the current line's JSON data. Select one to create a JSON key filter.
+- Shows all detected components with line counts
+- Multi-select: toggle components with Space, apply with Enter
+- Each selected component creates a separate filter rule
+
+Use Tab/Shift-Tab to switch between tabs. Space toggles selections, Enter applies.
 
 ### Filter logic
 
@@ -404,8 +415,11 @@ Common multi-step workflows:
 **Find all 500 errors in JSON logs:**
 Press `f`, type `status=500`, press Enter. This creates a JSON key-value filter matching lines where the `status` field equals `500`.
 
-**Show only two specific pods:**
-Press `f`, type the first pod name, press Enter. Press `f` again, type the second pod name, press Enter. Both are include filters — OR logic shows lines from either pod.
+**Show only specific components:**
+Press `f`, switch to the Component tab, select the components you want with Space, press Enter. OR logic shows lines from any selected component.
+
+**Hide noisy components:**
+Press `F`, switch to the Component tab, select the noisy components (e.g., health-check sidecars), press Enter. Those components are excluded.
 
 **Hide health checks and metrics noise:**
 Press `F` (filter out), type `/health`, press Enter. Press `F` again, type `/metrics`, press Enter. Both are exclude filters — AND logic hides lines matching either pattern.
@@ -436,7 +450,7 @@ Press `m` to open the filter manager dialog.
 | `k` / `i`     | Move filter up / down      |
 | Escape        | Close (apply changes)      |
 
-Filters show their type (`+` include, `-` exclude), status (ON/OFF), pattern, and indicators for regex (`/.../`) and case-sensitive (`[Aa]`).
+Filters show their type (`+` include, `-` exclude), status (ON/OFF), pattern, and indicators for regex (`/.../`), case-sensitive (`[Aa]`), and component filters (`component:name`).
 
 ### Quick toggle
 
@@ -786,15 +800,15 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 
 ### Filtering
 
-| Key     | Action                       |
-| ------- | ---------------------------- |
-| `f`     | Filter in                    |
-| `F`     | Filter out                   |
-| `e`     | Cycle log level filter       |
-| `!`     | Toggle anomaly filter        |
-| `x`     | Suspend / resume all filters |
-| `m`     | Manage filters               |
-| `1`-`9` | Toggle individual filter     |
+| Key     | Action                                 |
+| ------- | -------------------------------------- |
+| `f`     | Filter in (text, JSON key, component)  |
+| `F`     | Filter out (text, JSON key, component) |
+| `e`     | Cycle log level filter                 |
+| `!`     | Toggle anomaly filter                  |
+| `x`     | Suspend / resume all filters           |
+| `m`     | Manage filters                         |
+| `1`-`9` | Toggle individual filter               |
 
 ### Analysis
 

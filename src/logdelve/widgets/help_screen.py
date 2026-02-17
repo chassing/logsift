@@ -35,8 +35,8 @@ HELP_TEXT = """\
   c                                     Cycle component display (tag → full → off)
 
 [bold]Filtering[/bold]
-  f                                     Filter in (text, key=value, or regex)
-  F                                     Filter out (text, key=value, or regex)
+  f                                     Filter in (text, key=value, regex, or component)
+  F                                     Filter out (text, key=value, regex, or component)
   m                                     Manage filters (toggle, edit, delete, clear, reorder)
   x                                     Suspend/resume all filters
   e                                     Cycle log level filter (ALL → ERROR → WARN → INFO)
@@ -46,6 +46,7 @@ HELP_TEXT = """\
   a                                     Analyze message groups
 
   On JSON lines, f and F show key-value suggestions.
+  When components are detected, a Component tab allows filtering by component.
   Filters are auto-saved as sessions.
 
 [bold]Tailing[/bold]

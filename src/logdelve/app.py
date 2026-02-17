@@ -275,14 +275,28 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
 
     def action_filter_in(self) -> None:
         json_data = self._get_current_json_data()
-        self.push_screen(FilterDialog(FilterType.INCLUDE, json_data=json_data), callback=self._on_filter_result)
+        components = self.query_one("#log-view", LogView).get_all_components()
+        self.push_screen(
+            FilterDialog(FilterType.INCLUDE, json_data=json_data, components=components),
+            callback=self._on_filter_result,
+        )
 
     def action_filter_out(self) -> None:
         json_data = self._get_current_json_data()
-        self.push_screen(FilterDialog(FilterType.EXCLUDE, json_data=json_data), callback=self._on_filter_result)
+        components = self.query_one("#log-view", LogView).get_all_components()
+        self.push_screen(
+            FilterDialog(FilterType.EXCLUDE, json_data=json_data, components=components),
+            callback=self._on_filter_result,
+        )
 
-    def _on_filter_result(self, result: FilterRule | None) -> None:
-        if result is not None:
+    def _on_filter_result(self, result: FilterRule | list[FilterRule] | None) -> None:
+        if result is None:
+            return
+        if isinstance(result, list):
+            for rule in result:
+                self._filter_rules.append(rule)
+            self._apply_filters()
+        else:
             self._add_filter(result)
 
     def action_manage_filters(self) -> None:

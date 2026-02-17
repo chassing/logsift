@@ -181,6 +181,14 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 counts[line.log_level] = counts.get(line.log_level, 0) + 1
         return counts
 
+    def get_all_components(self) -> dict[str, int]:
+        """Get all detected components with line counts from all (unfiltered) lines."""
+        counts: dict[str, int] = {}
+        for line in self._all_lines:
+            if line.component is not None:
+                counts[line.component] = counts.get(line.component, 0) + 1
+        return counts
+
     @property
     def anomaly_filter(self) -> bool:
         """Whether the anomaly filter is active."""
