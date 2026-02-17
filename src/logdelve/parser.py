@@ -1,15 +1,23 @@
-"""Log line parsing: timestamp extraction, content classification, level and component detection."""
+"""Log line parsing: backward-compatible entry point.
+
+This module delegates to the parsers package. Direct imports of
+parse_line, classify_content, extract_timestamp, extract_log_level,
+and extract_component continue to work unchanged.
+"""
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import UTC, datetime
 from typing import Any
 
-from logdelve.models import ContentType, LogLevel, LogLine
+from logdelve.models import LogLine
+from logdelve.parsers.base import LogParser
+from logdelve.parsers.base import classify_content as classify_content
+from logdelve.parsers.base import extract_log_level as extract_log_level
 
-# Month name mapping for syslog-style timestamps
+# ---- Timestamp extraction (kept for backward compat) ----
+
 _MONTH_MAP: dict[str, int] = {
     "Jan": 1,
     "Feb": 2,
@@ -25,85 +33,38 @@ _MONTH_MAP: dict[str, int] = {
     "Dec": 12,
 }
 
-# Syslog: "Jan 15 10:30:00" or "Jan  5 10:30:00"
-_SYSLOG_RE = re.compile(
-    r"^(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(?P<day>\d{1,2})\s+(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+"
-)
-
-# Apache CLF: "[15/Jan/2024:10:30:00 +0000]"
-_APACHE_RE = re.compile(
-    r"^\[(?P<day>\d{2})/(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/(?P<year>\d{4}):(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+[+-]\d{4}\]\s+"
-)
-
-# ISO 8601 with space separator: "2024-01-15 10:30:00" or "2024-01-15 10:30:00.123"
 _ISO_SPACE_RE = re.compile(r"^(?P<dt>\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+")
-
-# Simple date-time with slashes: "2024/01/15 10:30:00"
+_SYSLOG_RE = re.compile(
+    r"^(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(?P<day>\d{1,2})\s+"
+    r"(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+"
+)
+_APACHE_RE = re.compile(
+    r"^\[(?P<day>\d{2})/(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/"
+    r"(?P<year>\d{4}):(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+[+-]\d{4}\]\s+"
+)
 _SLASH_DATE_RE = re.compile(
     r"^(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})\s+(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+"
 )
 
-# Log level normalization mapping
-_LEVEL_MAP: dict[str, LogLevel] = {
-    "trace": LogLevel.TRACE,
-    "debug": LogLevel.DEBUG,
-    "dbg": LogLevel.DEBUG,
-    "info": LogLevel.INFO,
-    "information": LogLevel.INFO,
-    "warn": LogLevel.WARN,
-    "warning": LogLevel.WARN,
-    "error": LogLevel.ERROR,
-    "err": LogLevel.ERROR,
-    "fatal": LogLevel.FATAL,
-    "critical": LogLevel.FATAL,
-    "crit": LogLevel.FATAL,
-    "panic": LogLevel.FATAL,
-    "emerg": LogLevel.FATAL,
-}
-
-# JSON field names to check for log level (in priority order)
-_LEVEL_JSON_KEYS = ("log_level", "level", "severity", "loglevel", "lvl")
-
-# Text patterns for log level detection (after timestamp)
-_LEVEL_BRACKET_RE = re.compile(
-    r"\[(?P<level>TRACE|DEBUG|DBG|INFO|WARN|WARNING|ERROR|ERR|FATAL|CRITICAL|CRIT|PANIC|EMERG)\]",
-    re.IGNORECASE,
-)
-_LEVEL_WORD_RE = re.compile(
-    r"(?:^|\s)(?P<level>TRACE|DEBUG|DBG|INFO|WARN|WARNING|ERROR|ERR|FATAL|CRITICAL)\s",
-    re.IGNORECASE,
-)
-_LEVEL_KV_RE = re.compile(r"(?:level|severity)=(?P<level>\w+)", re.IGNORECASE)
-
-# JSON field names to check for component
-_COMPONENT_JSON_KEYS = ("service", "component", "app", "source", "container", "pod")
-
-# Kubernetes pod prefix: "[pod-name-abc123]" or "pod-name container"
+# Component prefix patterns
+_DOCKER_COMPOSE_RE = re.compile(r"^(?P<comp>[\w.-]+)\s+\|\s+")
 _K8S_BRACKET_RE = re.compile(r"^\[(?P<comp>[a-z0-9][\w.-]+)\]\s*")
 _K8S_PREFIX_RE = re.compile(r"^(?P<comp>[a-z0-9][\w.-]+)\s+(?P<cont>[a-z0-9][\w.-]+)\s+\d{4}-")
-
-# Docker Compose: "service-name  | "
-_DOCKER_COMPOSE_RE = re.compile(r"^(?P<comp>[\w.-]+)\s+\|\s+")
-
-# Syslog content: "hostname program[pid]: message" (after timestamp stripping)
-_SYSLOG_HOST_RE = re.compile(r"^(?P<host>[a-zA-Z][\w.-]+)\s+(?P<prog>[\w./-]+?)(?:\[(?P<pid>\d+)\])?:\s+")
+_COMPONENT_JSON_KEYS = ("service", "component", "app", "source", "container", "pod")
 
 
 def _try_iso(raw: str) -> tuple[datetime | None, str]:
-    """Try to extract an ISO 8601 timestamp from the start of the line."""
     m = _ISO_SPACE_RE.match(raw)
     if m is None:
         return None, raw
-    dt_str = m.group("dt")
     try:
-        ts = datetime.fromisoformat(dt_str)
+        ts = datetime.fromisoformat(m.group("dt"))
     except ValueError:
         return None, raw
     return ts, raw[m.end() :]
 
 
 def _try_syslog(raw: str) -> tuple[datetime | None, str]:
-    """Try to extract a syslog-style timestamp."""
     m = _SYSLOG_RE.match(raw)
     if m is None:
         return None, raw
@@ -120,7 +81,6 @@ def _try_syslog(raw: str) -> tuple[datetime | None, str]:
 
 
 def _try_apache(raw: str) -> tuple[datetime | None, str]:
-    """Try to extract an Apache CLF timestamp."""
     m = _APACHE_RE.match(raw)
     if m is None:
         return None, raw
@@ -136,7 +96,6 @@ def _try_apache(raw: str) -> tuple[datetime | None, str]:
 
 
 def _try_slash_date(raw: str) -> tuple[datetime | None, str]:
-    """Try to extract a slash-separated date-time."""
     m = _SLASH_DATE_RE.match(raw)
     if m is None:
         return None, raw
@@ -164,122 +123,48 @@ def extract_timestamp(raw: str) -> tuple[datetime | None, str]:
     return None, raw
 
 
-def classify_content(content: str) -> tuple[ContentType, dict[str, Any] | None]:
-    """Classify content as JSON or plain text.
-
-    Returns (content_type, parsed_json). parsed_json is None for text content.
-    """
-    stripped = content.strip()
-    if stripped.startswith("{"):
-        try:
-            parsed: dict[str, Any] = json.loads(stripped)
-            return ContentType.JSON, parsed
-        except (json.JSONDecodeError, ValueError):
-            pass
-    return ContentType.TEXT, None
-
-
-def extract_log_level(content: str, parsed_json: dict[str, Any] | None) -> LogLevel | None:
-    """Extract log level from content or JSON data.
-
-    Checks JSON fields first, then text patterns.
-    """
-    # Check JSON fields
-    if parsed_json is not None:
-        for key in _LEVEL_JSON_KEYS:
-            if key in parsed_json:
-                value = str(parsed_json[key]).lower().strip()
-                if value in _LEVEL_MAP:
-                    return _LEVEL_MAP[value]
-
-    # Check text patterns: [LEVEL], LEVEL, level=value
-    for pattern in (_LEVEL_BRACKET_RE, _LEVEL_KV_RE, _LEVEL_WORD_RE):
-        m = pattern.search(content)
-        if m:
-            value = m.group("level").lower().strip()
-            if value in _LEVEL_MAP:
-                return _LEVEL_MAP[value]
-
-    # Content-based heuristic for syslog lines without explicit level
-    lower = content.lower()
-    if any(kw in lower for kw in ("fail", "refused", "denied", "timeout", "abort", "segfault", "panic")):
-        return LogLevel.ERROR
-    if any(kw in lower for kw in ("deprecated", "warning:", "warn:", "cannot", "unable")):
-        return LogLevel.WARN
-
-    return None
-
-
 def _strip_component_prefix(raw: str) -> tuple[str | None, str]:
-    """Strip a component prefix from the line and return (component, remainder).
-
-    Handles [name], docker compose, and k8s formats.
-    Returns (None, raw) if no prefix found.
-    """
-    # Docker Compose: "service-name  | ..."
+    """Strip a component prefix from the line and return (component, remainder)."""
     m = _DOCKER_COMPOSE_RE.match(raw)
     if m:
         return m.group("comp"), raw[m.end() :]
-
-    # Kubernetes/CloudWatch bracket: "[pod-name] ..."
     m = _K8S_BRACKET_RE.match(raw)
     if m:
         return m.group("comp"), raw[m.end() :]
-
-    # Kubernetes prefix: "pod-name container 2024-..."
     m = _K8S_PREFIX_RE.match(raw)
     if m:
         return m.group("comp"), raw[m.start("cont") :]
-
     return None, raw
 
 
 def extract_component(raw: str, parsed_json: dict[str, Any] | None) -> str | None:
-    """Extract component/service name from the raw line or JSON data.
-
-    Checks for Kubernetes, Docker Compose prefixes, then JSON fields.
-    """
+    """Extract component/service name from the raw line or JSON data."""
     comp, _ = _strip_component_prefix(raw)
     if comp is not None:
         return comp
-
-    # JSON fields
     if parsed_json is not None:
         for key in _COMPONENT_JSON_KEYS:
             if key in parsed_json and isinstance(parsed_json[key], str):
                 return str(parsed_json[key])
-
     return None
 
 
 def parse_line(line_number: int, raw: str) -> LogLine:
-    """Parse a raw log line into a LogLine model."""
-    # Strip component prefix before timestamp extraction so
-    # "[stream] 2024-01-15T..." correctly finds the timestamp
-    prefix_component, remainder = _strip_component_prefix(raw)
-    timestamp, content = extract_timestamp(remainder)
-    content_type, parsed_json = classify_content(content)
-    log_level = extract_log_level(content, parsed_json)
-    # Use prefix component, or try JSON fields, or syslog hostname
-    component = prefix_component
-    if component is None:
-        component = extract_component(raw, parsed_json)
-    # Syslog: extract hostname from content and strip it from display
-    if component is None and parsed_json is None:
-        m = _SYSLOG_HOST_RE.match(content)
-        if m:
-            component = m.group("host")
-            content = content[m.end() :]  # strip "hostname program[pid]: " from content
-    # Default to INFO for lines with a timestamp but no detected level
-    if log_level is None and timestamp is not None:
-        log_level = LogLevel.INFO
-    return LogLine(
-        line_number=line_number,
-        raw=raw,
-        timestamp=timestamp,
-        content_type=content_type,
-        content=content,
-        parsed_json=parsed_json,
-        log_level=log_level,
-        component=component,
-    )
+    """Parse a raw log line into a LogLine model.
+
+    Delegates to the AutoParser from the parsers package.
+    """
+    return _get_default_parser().parse_line(line_number, raw)
+
+
+_default_parser = None
+
+
+def _get_default_parser() -> LogParser:
+    """Lazy-load the default AutoParser."""
+    global _default_parser
+    if _default_parser is None:
+        from logdelve.parsers import ParserName, get_parser
+
+        _default_parser = get_parser(ParserName.AUTO)
+    return _default_parser

@@ -202,20 +202,22 @@ class FieldGroup:
 
 
 # Keys to skip in field analysis (noise/boilerplate)
-_SKIP_FIELD_KEYS = frozenset({
-    "timestamp",
-    "time",
-    "ts",
-    "@timestamp",
-    "request_id",
-    "trace_id",
-    "span_id",
-    "level",
-    "log_level",
-    "severity",
-    "loglevel",
-    "lvl",
-})
+_SKIP_FIELD_KEYS = frozenset(
+    {
+        "timestamp",
+        "time",
+        "ts",
+        "@timestamp",
+        "request_id",
+        "trace_id",
+        "span_id",
+        "level",
+        "log_level",
+        "severity",
+        "loglevel",
+        "lvl",
+    }
+)
 
 
 def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:

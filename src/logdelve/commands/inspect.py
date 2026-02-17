@@ -9,7 +9,24 @@ from typing import Annotated
 
 import typer
 
+from logdelve.parsers import ParserName, detect_parser, get_parser
+from logdelve.parsers.base import LogParser
 from logdelve.reader import is_pipe, read_file
+
+
+def _resolve_parser(parser_name: ParserName, file: Path | None) -> LogParser:
+    """Resolve the parser to use. Auto-detect if 'auto' and file is given."""
+    if parser_name != ParserName.AUTO:
+        return get_parser(parser_name)
+
+    # For auto mode with a file, sample first lines for detection
+    if file is not None:
+        with file.open() as f:
+            sample = [f.readline().rstrip("\n") for _ in range(20)]
+        return detect_parser(sample)
+
+    # stdin/pipe: can't sample ahead, use AutoParser (per-line detection)
+    return get_parser(ParserName.AUTO)
 
 
 def _setup_pipe_input() -> int:
@@ -34,6 +51,9 @@ def inspect(
     baseline: Annotated[
         Path | None, typer.Option("--baseline", "-b", help="Baseline log file for anomaly detection")
     ] = None,
+    parser: Annotated[
+        ParserName, typer.Option("--parser", "-p", help="Log format parser (default: auto-detect)")
+    ] = ParserName.AUTO,
 ) -> None:
     """View and filter log lines in a terminal UI."""
     if file is not None and not file.is_file():
@@ -44,12 +64,13 @@ def inspect(
         typer.echo(f"Error: baseline file {baseline} not found")
         raise typer.Exit(1)
 
+    log_parser = _resolve_parser(parser, file)
     pipe = is_pipe() if file is None else False
     tail = not no_tail
     pipe_fd: int | None = None
 
     if file is not None:
-        lines = [] if tail else read_file(file)
+        lines = [] if tail else read_file(file, parser=log_parser)
         source = str(file)
     elif pipe:
         pipe_fd = _setup_pipe_input()
@@ -69,5 +90,6 @@ def inspect(
         tail=tail if file is not None else False,
         pipe_fd=pipe_fd,
         baseline_path=baseline,
+        parser=log_parser,
     )
     log_app.run(mouse=False)

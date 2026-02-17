@@ -108,17 +108,13 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
                 self._field_groups = build_field_groups(self._lines)
             field_items = self._sorted_field_groups()
             item_count = len(field_items)
-            title_label.update(
-                f"📊 {item_count} field values  |  sort: {self._sort} {order_arrow}  |  mode: fields"
-            )
+            title_label.update(f"📊 {item_count} field values  |  sort: {self._sort} {order_arrow}  |  mode: fields")
             for fg in field_items:
                 ol.add_option(Option(self._format_field_group(fg)))
         else:
             tmpl_items = self._sorted_template_groups()
             item_count = len(tmpl_items)
-            title_label.update(
-                f"📊 {item_count} patterns  |  sort: {self._sort} {order_arrow}  |  mode: messages"
-            )
+            title_label.update(f"📊 {item_count} patterns  |  sort: {self._sort} {order_arrow}  |  mode: messages")
             for group in tmpl_items:
                 ol.add_option(Option(self._format_template_group(group)))
 

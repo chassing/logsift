@@ -113,7 +113,7 @@ class LogView(ScrollView, can_focus=True):
         Binding("end", "scroll_end", "End", show=False),
         Binding("g", "goto_top_or_prefix", "Top (gg)", show=False),
         Binding("G", "scroll_end", "Bottom", show=False),
-        Binding("j", "toggle_json_global", "JSON"),
+        Binding("j", "toggle_json_global", "Expand"),
         Binding("enter", "toggle_json_line", "Expand", show=False),
         Binding("#", "toggle_line_numbers", "Lines#"),
         Binding("c", "cycle_component_display", "Component"),
@@ -131,9 +131,8 @@ class LogView(ScrollView, can_focus=True):
         self._filter_rules: list[FilterRule] = []
         self._max_width: int = 0
         self._show_line_numbers: bool = True
-        # JSON expansion state
+        # Expansion state
         self._global_expand: bool = False
-        self._line_expand: set[int] = set()
         self._sticky_expand: bool = False
         # Height tracking for variable-height lines
         self._heights: list[int] = []
@@ -214,7 +213,6 @@ class LogView(ScrollView, can_focus=True):
         """Replace all log lines and refresh display."""
         self._all_lines = lines
         self._global_expand = False
-        self._line_expand.clear()
         self._sticky_expand = False
         self._filter_rules.clear()
         self.cursor_line = 0
@@ -333,8 +331,6 @@ class LogView(ScrollView, can_focus=True):
     def _is_expanded(self, line_index: int) -> bool:
         """Check if a visible line index should be rendered expanded."""
         if self._global_expand:
-            return True
-        if line_index in self._line_expand:
             return True
         return self._sticky_expand and line_index == self.cursor_line
 
@@ -747,33 +743,18 @@ class LogView(ScrollView, can_focus=True):
             self.cursor_line = len(self._lines) - 1
 
     def action_toggle_json_global(self) -> None:
-        """Toggle global JSON pretty-print for all lines."""
+        """Toggle expand for all lines (JSON pretty-print / full raw text)."""
         self._global_expand = not self._global_expand
-        self._line_expand.clear()
         self._sticky_expand = False
         self._recompute_heights()
         self._scroll_cursor_into_view()
         self.refresh()
 
     def action_toggle_json_line(self) -> None:
-        """Toggle expand for the current line (JSON pretty-print or full raw line)."""
-        visible = self._lines
-        if not visible:
+        """Toggle sticky expand for the current line (follows cursor on move)."""
+        if self._global_expand:
             return
-        line = visible[self.cursor_line]
-
-        if line.content_type == ContentType.JSON and line.parsed_json is not None:
-            if self._global_expand:
-                return
-            self._sticky_expand = not self._sticky_expand
-        else:
-            # Text lines: toggle showing full raw line (with original timestamp)
-            idx = self.cursor_line
-            if idx in self._line_expand:
-                self._line_expand.discard(idx)
-            else:
-                self._line_expand.add(idx)
-
+        self._sticky_expand = not self._sticky_expand
         self._recompute_heights()
         self._scroll_cursor_into_view()
         self.refresh()

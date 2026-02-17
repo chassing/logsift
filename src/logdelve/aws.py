@@ -69,9 +69,7 @@ def _extract_message(raw_message: str, message_key: str | None) -> str:
     return raw_message
 
 
-def _format_event(
-    event: FilteredLogEventTypeDef, message_key: str | None = None
-) -> tuple[str, str, str]:
+def _format_event(event: FilteredLogEventTypeDef, message_key: str | None = None) -> tuple[str, str, str]:
     """Format a single CloudWatch log event as (iso_timestamp, message, stream_name)."""
     ts = _ms_to_iso(event.get("timestamp", 0))
     raw_msg = event.get("message", "").rstrip("\n")

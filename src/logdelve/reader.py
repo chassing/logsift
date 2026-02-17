@@ -10,15 +10,23 @@ from pathlib import Path
 import aiofiles
 
 from logdelve.models import LogLine
-from logdelve.parser import parse_line
+from logdelve.parsers.base import LogParser
 
 
-def read_file(path: Path) -> list[LogLine]:
+def _default_parser() -> LogParser:
+    """Get the default parser (AutoParser)."""
+    from logdelve.parsers import ParserName, get_parser
+
+    return get_parser(ParserName.AUTO)
+
+
+def read_file(path: Path, parser: LogParser | None = None) -> list[LogLine]:
     """Read all log lines from a file (synchronous)."""
+    p = parser or _default_parser()
     lines: list[LogLine] = []
     with path.open() as f:
         for i, raw_line in enumerate(f, start=1):
-            lines.append(parse_line(i, raw_line.rstrip("\n")))
+            lines.append(p.parse_line(i, raw_line.rstrip("\n")))
     return lines
 
 
@@ -27,21 +35,23 @@ def is_pipe() -> bool:
     return not sys.stdin.isatty()
 
 
-def read_stdin() -> list[LogLine]:
+def read_stdin(parser: LogParser | None = None) -> list[LogLine]:
     """Read all log lines from stdin (synchronous)."""
+    p = parser or _default_parser()
     lines: list[LogLine] = []
     for i, raw_line in enumerate(sys.stdin, start=1):
-        lines.append(parse_line(i, raw_line.rstrip("\n")))
+        lines.append(p.parse_line(i, raw_line.rstrip("\n")))
     return lines
 
 
-async def read_file_async(path: Path, tail: bool = False) -> AsyncIterator[LogLine]:
+async def read_file_async(path: Path, tail: bool = False, parser: LogParser | None = None) -> AsyncIterator[LogLine]:
     """Read log lines from a file asynchronously, optionally tailing."""
+    p = parser or _default_parser()
     line_number = 0
     async with aiofiles.open(path) as f:
         async for raw_line in f:
             line_number += 1
-            yield parse_line(line_number, raw_line.rstrip("\n"))
+            yield p.parse_line(line_number, raw_line.rstrip("\n"))
 
         if not tail:
             return
@@ -52,7 +62,7 @@ async def read_file_async(path: Path, tail: bool = False) -> AsyncIterator[LogLi
             line = await f.readline()
             if line:
                 line_number += 1
-                yield parse_line(line_number, line.rstrip("\n"))
+                yield p.parse_line(line_number, line.rstrip("\n"))
             else:
                 # Check for file truncation (log rotation)
                 try:
@@ -68,10 +78,11 @@ async def read_file_async(path: Path, tail: bool = False) -> AsyncIterator[LogLi
                 await asyncio.sleep(0.1)
 
 
-async def read_pipe_async(pipe_fd: int) -> AsyncIterator[LogLine]:
+async def read_pipe_async(pipe_fd: int, parser: LogParser | None = None) -> AsyncIterator[LogLine]:
     """Read log lines from a pipe file descriptor asynchronously."""
+    p = parser or _default_parser()
     line_number = 0
     async with aiofiles.open(pipe_fd, closefd=True) as f:
         async for raw_line in f:
             line_number += 1
-            yield parse_line(line_number, raw_line.rstrip("\n"))
+            yield p.parse_line(line_number, raw_line.rstrip("\n"))

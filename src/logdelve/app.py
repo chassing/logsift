@@ -16,6 +16,7 @@ from textual.worker import get_current_worker
 from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
 from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
+from logdelve.parsers.base import LogParser
 from logdelve.reader import read_file, read_file_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
@@ -73,6 +74,7 @@ class LogDelveApp(App[None]):
         tail: bool = False,
         pipe_fd: int | None = None,
         baseline_path: Path | None = None,
+        parser: LogParser | None = None,
     ) -> None:
         super().__init__()
         self._lines = lines or []
@@ -82,6 +84,7 @@ class LogDelveApp(App[None]):
         self._file_path = file_path
         self._tail = tail
         self._pipe_fd = pipe_fd
+        self._parser = parser
         self._tail_paused: bool = False
         self._tail_buffer: list[LogLine] = []
         self._last_search: SearchQuery | None = None
@@ -128,7 +131,7 @@ class LogDelveApp(App[None]):
 
         # Baseline anomaly detection
         if self._baseline_path and self._lines:
-            baseline_lines = read_file(self._baseline_path)
+            baseline_lines = read_file(self._baseline_path, parser=self._parser)
             baseline = build_baseline(baseline_lines)
             self._anomaly_result = detect_anomalies(self._lines, baseline)
             log_view.set_anomaly_scores(self._anomaly_result.scores)
@@ -141,10 +144,12 @@ class LogDelveApp(App[None]):
 
         if self._tail and self._file_path:
             status_bar.set_tailing(True)
-            self.run_worker(self._tail_worker(read_file_async(self._file_path, tail=True)), exclusive=True)
+            self.run_worker(
+                self._tail_worker(read_file_async(self._file_path, tail=True, parser=self._parser)), exclusive=True
+            )
         elif self._pipe_fd is not None:
             status_bar.set_tailing(True)
-            self.run_worker(self._tail_worker(read_pipe_async(self._pipe_fd)), exclusive=True)
+            self.run_worker(self._tail_worker(read_pipe_async(self._pipe_fd, parser=self._parser)), exclusive=True)
 
         self._update_status_bar()
 
