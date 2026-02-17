@@ -54,9 +54,7 @@ class SyslogParser(LogParser):
         component = None
         m_host = _SYSLOG_HOST_RE.match(content)
         if m_host:
-            prog = m_host.group("prog")
-            pid = m_host.group("pid")
-            component = f"{prog}[{pid}]" if pid else prog
+            component = m_host.group("prog")
             content = content[m_host.end() :]
         content_type, parsed_json = classify_content(content)
         log_level = extract_log_level(content, parsed_json)

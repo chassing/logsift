@@ -35,7 +35,7 @@ class TestSyslogParserTryParse:
     def test_program_with_pid(self) -> None:
         result = self.parser.try_parse("Jan 15 10:30:03 server01 nginx[1234]: GET /index.html")
         assert result is not None
-        assert result.component == "nginx[1234]"
+        assert result.component == "nginx"
         assert "GET /index.html" in result.content
 
     def test_program_without_pid(self) -> None:
@@ -46,7 +46,7 @@ class TestSyslogParserTryParse:
     def test_systemd_with_pid(self) -> None:
         result = self.parser.try_parse("Feb 17 09:58:07 prod-ci-int-bastion systemd[3877079]: Reached target Sockets.")
         assert result is not None
-        assert result.component == "systemd[3877079]"
+        assert result.component == "systemd"
         assert result.content == "Reached target Sockets."
 
     def test_no_hostname_pattern(self) -> None:
