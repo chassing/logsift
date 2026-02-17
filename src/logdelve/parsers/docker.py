@@ -1,6 +1,5 @@
 """Docker Compose log format parser."""
 
-# ruff: noqa: PLC0415
 from __future__ import annotations
 
 import re
@@ -11,6 +10,8 @@ from logdelve.parsers.base import (
     classify_content,
     extract_log_level,
 )
+from logdelve.parsers.iso import IsoParser
+from logdelve.parsers.syslog import SyslogParser
 
 # Docker Compose: "service-name  | "
 _DOCKER_COMPOSE_RE = re.compile(r"^(?P<comp>[\w.-]+)\s+\|\s+")
@@ -28,9 +29,6 @@ class DockerParser(LogParser):
         return "Docker Compose (service-name | message)"
 
     def __init__(self) -> None:
-        from logdelve.parsers.iso import IsoParser
-        from logdelve.parsers.syslog import SyslogParser
-
         self._timestamp_parsers = [IsoParser(), SyslogParser()]
 
     def try_parse(self, raw: str) -> ParseResult | None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from logdelve.models import ContentType, LogLevel
-from logdelve.parsers.base import classify_content, extract_component_from_json, extract_log_level
+from logdelve.parsers import classify_content, extract_component_from_json, extract_log_level
 
 
 class TestClassifyContent:
@@ -64,6 +64,12 @@ class TestExtractLogLevel:
 
     def test_kv_pattern(self) -> None:
         assert extract_log_level("level=error msg=fail", None) == LogLevel.ERROR
+
+    def test_debug(self) -> None:
+        assert extract_log_level("", {"level": "debug"}) == LogLevel.DEBUG
+
+    def test_trace(self) -> None:
+        assert extract_log_level("", {"level": "trace"}) == LogLevel.TRACE
 
     def test_no_level(self) -> None:
         assert extract_log_level("just some text", None) is None

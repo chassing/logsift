@@ -10,6 +10,7 @@ from logdelve.models import ContentType, LogLevel
 from logdelve.parsers.base import (
     LogParser,
     ParseResult,
+    extract_log_level,
 )
 
 # journalctl PRIORITY field mapping (syslog severity levels)
@@ -77,8 +78,6 @@ class JournalctlParser(LogParser):
 
         # If no level from PRIORITY, try common level fields in MESSAGE
         if log_level is None and message:
-            from logdelve.parsers.base import extract_log_level  # noqa: PLC0415
-
             log_level = extract_log_level(message, None)
 
         return ParseResult(

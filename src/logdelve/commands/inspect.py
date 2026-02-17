@@ -13,7 +13,7 @@ from logdelve.parsers import ParserName, detect_parser, get_parser
 from logdelve.reader import is_pipe, read_file
 
 if TYPE_CHECKING:
-    from logdelve.parsers.base import LogParser
+    from logdelve.parsers import LogParser
 
 
 def _resolve_parser(parser_name: ParserName, file: Path | None) -> LogParser:

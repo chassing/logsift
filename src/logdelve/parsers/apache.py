@@ -7,26 +7,12 @@ from datetime import UTC, datetime
 from typing import override
 
 from logdelve.parsers.base import (
+    MONTH_MAP,
     LogParser,
     ParseResult,
     classify_content,
     extract_log_level,
 )
-
-_MONTH_MAP: dict[str, int] = {
-    "Jan": 1,
-    "Feb": 2,
-    "Mar": 3,
-    "Apr": 4,
-    "May": 5,
-    "Jun": 6,
-    "Jul": 7,
-    "Aug": 8,
-    "Sep": 9,
-    "Oct": 10,
-    "Nov": 11,
-    "Dec": 12,
-}
 
 # Apache CLF: "[15/Jan/2024:10:30:00 +0000]"
 _APACHE_RE = re.compile(
@@ -53,7 +39,7 @@ class ApacheParser(LogParser):
             return None
         ts = datetime(
             year=int(m.group("year")),
-            month=_MONTH_MAP[m.group("month")],
+            month=MONTH_MAP[m.group("month")],
             day=int(m.group("day")),
             hour=int(m.group("hour")),
             minute=int(m.group("min")),

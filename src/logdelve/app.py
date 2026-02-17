@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
     from pathlib import Path
 
-    from logdelve.parsers.base import LogParser
+    from logdelve.parsers import LogParser
 _ANALYZE_LINE_THRESHOLD = 10_000
 
 

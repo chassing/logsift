@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from logdelve.models import LogLine
-    from logdelve.parsers.base import LogParser
+    from logdelve.parsers import LogParser
 
 
 def _default_parser() -> LogParser:

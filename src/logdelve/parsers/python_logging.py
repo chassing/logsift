@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import override
 
 from logdelve.parsers.base import (
-    _LEVEL_MAP,
+    LEVEL_MAP,
     LogParser,
     ParseResult,
     classify_content,
@@ -53,7 +53,7 @@ class PythonLoggingParser(LogParser):
             return None
 
         level_str = m.group("level").lower()
-        log_level = _LEVEL_MAP.get(level_str)
+        log_level = LEVEL_MAP.get(level_str)
         component = m.group("name")
         content = m.group("msg")
 

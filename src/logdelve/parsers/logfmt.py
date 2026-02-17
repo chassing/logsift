@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from logdelve.models import ContentType
 from logdelve.parsers.base import (
-    _LEVEL_MAP,
+    LEVEL_MAP,
     LogParser,
     ParseResult,
 )
@@ -72,7 +72,7 @@ class LogfmtParser(LogParser):
         log_level = None
         for lk in _LEVEL_KEYS:
             if lk in data:
-                log_level = _LEVEL_MAP.get(data[lk].lower())
+                log_level = LEVEL_MAP.get(data[lk].lower())
                 if log_level is not None:
                     break
 
