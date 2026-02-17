@@ -524,8 +524,8 @@ class LogView(ScrollView, can_focus=True):
                 line, content_width, lineno_style, timestamp_style, bg_style, self._show_line_numbers
             )
             strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
-        elif expanded and line.content_type == ContentType.TEXT:
-            # Expanded text: show the full raw line (with original timestamp/date)
+        elif expanded and line.content_type == ContentType.TEXT and sub_row == 1:
+            # Expanded text row 1: show the full raw line (with original timestamp/date)
             segments = [Segment(f"  {line.raw}", timestamp_style + bg_style)]
             strip = Strip(segments)
         else:

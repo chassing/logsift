@@ -382,8 +382,10 @@ class LogDelveApp(App[None]):
             return
         n = len(lines)
         if n > 10000:
-            self.notify(f"Analyzing {n:,} lines...", timeout=2)
-        self.call_after_refresh(self._open_analyze, lines)
+            self.notify(f"Analyzing {n:,} lines...", timeout=3)
+            self.set_timer(0.1, lambda: self._open_analyze(lines))
+        else:
+            self._open_analyze(lines)
 
     def _open_analyze(self, lines: list[LogLine] | None = None) -> None:
         """Open the analyze dialog (deferred to show notification first)."""

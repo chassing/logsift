@@ -264,11 +264,15 @@ def parse_line(line_number: int, raw: str) -> LogLine:
     component = prefix_component
     if component is None:
         component = extract_component(raw, parsed_json)
-    # Syslog: extract hostname from content (after timestamp)
+    # Syslog: extract hostname from content and strip it from display
     if component is None and parsed_json is None:
         m = _SYSLOG_HOST_RE.match(content)
         if m:
             component = m.group("host")
+            content = content[m.end() :]  # strip "hostname program[pid]: " from content
+    # Default to INFO for lines with a timestamp but no detected level
+    if log_level is None and timestamp is not None:
+        log_level = LogLevel.INFO
     return LogLine(
         line_number=line_number,
         raw=raw,
