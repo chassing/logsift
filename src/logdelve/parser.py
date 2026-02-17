@@ -85,6 +85,9 @@ _K8S_PREFIX_RE = re.compile(r"^(?P<comp>[a-z0-9][\w.-]+)\s+(?P<cont>[a-z0-9][\w.
 # Docker Compose: "service-name  | "
 _DOCKER_COMPOSE_RE = re.compile(r"^(?P<comp>[\w.-]+)\s+\|\s+")
 
+# Syslog content: "hostname program[pid]: message" (after timestamp stripping)
+_SYSLOG_HOST_RE = re.compile(r"^(?P<host>[a-zA-Z][\w.-]+)\s+(?P<prog>[\w./-]+?)(?:\[(?P<pid>\d+)\])?:\s+")
+
 
 def _try_iso(raw: str) -> tuple[datetime | None, str]:
     """Try to extract an ISO 8601 timestamp from the start of the line."""
@@ -197,6 +200,13 @@ def extract_log_level(content: str, parsed_json: dict[str, Any] | None) -> LogLe
             if value in _LEVEL_MAP:
                 return _LEVEL_MAP[value]
 
+    # Content-based heuristic for syslog lines without explicit level
+    lower = content.lower()
+    if any(kw in lower for kw in ("fail", "refused", "denied", "timeout", "abort", "segfault", "panic")):
+        return LogLevel.ERROR
+    if any(kw in lower for kw in ("deprecated", "warning:", "warn:", "cannot", "unable")):
+        return LogLevel.WARN
+
     return None
 
 
@@ -250,10 +260,15 @@ def parse_line(line_number: int, raw: str) -> LogLine:
     timestamp, content = extract_timestamp(remainder)
     content_type, parsed_json = classify_content(content)
     log_level = extract_log_level(content, parsed_json)
-    # Use prefix component, or try JSON fields
+    # Use prefix component, or try JSON fields, or syslog hostname
     component = prefix_component
     if component is None:
         component = extract_component(raw, parsed_json)
+    # Syslog: extract hostname from content (after timestamp)
+    if component is None and parsed_json is None:
+        m = _SYSLOG_HOST_RE.match(content)
+        if m:
+            component = m.group("host")
     return LogLine(
         line_number=line_number,
         raw=raw,

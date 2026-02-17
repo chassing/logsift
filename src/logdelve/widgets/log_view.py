@@ -524,6 +524,10 @@ class LogView(ScrollView, can_focus=True):
                 line, content_width, lineno_style, timestamp_style, bg_style, self._show_line_numbers
             )
             strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
+        elif expanded and line.content_type == ContentType.TEXT:
+            # Expanded text: show the full raw line (with original timestamp/date)
+            segments = [Segment(f"  {line.raw}", timestamp_style + bg_style)]
+            strip = Strip(segments)
         else:
             search_match_style = self.get_component_rich_style("logview--search-match") if line_matches else None
             search_current_style = (
@@ -752,18 +756,23 @@ class LogView(ScrollView, can_focus=True):
         self.refresh()
 
     def action_toggle_json_line(self) -> None:
-        """Toggle JSON pretty-print for the current line."""
+        """Toggle expand for the current line (JSON pretty-print or full raw line)."""
         visible = self._lines
         if not visible:
             return
         line = visible[self.cursor_line]
-        if line.content_type != ContentType.JSON or line.parsed_json is None:
-            return
 
-        if self._global_expand:
-            return
-
-        self._sticky_expand = not self._sticky_expand
+        if line.content_type == ContentType.JSON and line.parsed_json is not None:
+            if self._global_expand:
+                return
+            self._sticky_expand = not self._sticky_expand
+        else:
+            # Text lines: toggle showing full raw line (with original timestamp)
+            idx = self.cursor_line
+            if idx in self._line_expand:
+                self._line_expand.discard(idx)
+            else:
+                self._line_expand.add(idx)
 
         self._recompute_heights()
         self._scroll_cursor_into_view()

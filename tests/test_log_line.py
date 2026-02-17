@@ -32,10 +32,13 @@ def _make_text_line(line_number: int = 1) -> LogLine:
 
 
 class TestGetLineHeight:
-    def test_text_line_always_1(self) -> None:
+    def test_text_line_compact(self) -> None:
         line = _make_text_line()
         assert get_line_height(line, expanded=False) == 1
-        assert get_line_height(line, expanded=True) == 1
+
+    def test_text_line_expanded(self) -> None:
+        line = _make_text_line()
+        assert get_line_height(line, expanded=True) == 2
 
     def test_json_line_collapsed(self) -> None:
         line = _make_json_line()
@@ -54,7 +57,8 @@ class TestGetLineHeight:
             content="{}",
             parsed_json=None,
         )
-        assert get_line_height(line, expanded=True) == 1
+        # JSON without parsed data falls through to text expand (height 2)
+        assert get_line_height(line, expanded=True) == 2
 
     def test_nested_json_height(self) -> None:
         line = _make_json_line(json_str='{"a": {"b": {"c": 1}}, "d": [1, 2]}')

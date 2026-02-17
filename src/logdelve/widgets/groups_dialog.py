@@ -65,6 +65,8 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "cancel", "Close"),
+        Binding("f", "select_filter_in", "Filter in"),
+        Binding("F", "select_filter_out", "Filter out"),
         Binding("m", "toggle_mode", "Mode"),
         Binding("s", "cycle_sort", "Sort"),
         Binding("r", "reverse_order", "Reverse"),
@@ -84,7 +86,7 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
             yield Label("", id="groups-title", classes="title")
             yield OptionList(id="groups-list")
             yield Label(
-                "Enter: filter  m: mode  s: sort  r: reverse  Esc: close",
+                "f filter-in  F filter-out  m mode  s sort  r reverse  Esc close",
                 classes="hint",
             )
 
@@ -181,17 +183,20 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
         text.append(fg.value)
         return text
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        idx = event.option_index
+    def _select_current(self, filter_type: FilterType) -> None:
+        """Create a filter from the currently highlighted item."""
+        ol = self.query_one("#groups-list", OptionList)
+        idx = ol.highlighted
+        if idx is None:
+            return
         if self._mode == "fields":
             field_items = self._sorted_field_groups()
             if 0 <= idx < len(field_items):
                 fg = field_items[idx]
                 if fg.is_json_filter:
-                    # Exact value match (=0, string values, bools)
                     self.dismiss(
                         FilterRule(
-                            filter_type=FilterType.INCLUDE,
+                            filter_type=filter_type,
                             pattern=f"{fg.key}={fg.value}",
                             is_json_key=True,
                             json_key=fg.key,
@@ -199,10 +204,10 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
                         )
                     )
                 else:
-                    # Synthetic group like >0: match non-zero values
+                    # >0 group: always include (regex matches non-zero)
                     self.dismiss(
                         FilterRule(
-                            filter_type=FilterType.INCLUDE,
+                            filter_type=filter_type,
                             pattern=f'"{fg.key}": [1-9]',
                             is_regex=True,
                         )
@@ -214,11 +219,17 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
                 pattern = template_to_regex(group.content_pattern)
                 self.dismiss(
                     FilterRule(
-                        filter_type=FilterType.INCLUDE,
+                        filter_type=filter_type,
                         pattern=pattern,
                         is_regex=True,
                     )
                 )
+
+    def action_select_filter_in(self) -> None:
+        self._select_current(FilterType.INCLUDE)
+
+    def action_select_filter_out(self) -> None:
+        self._select_current(FilterType.EXCLUDE)
 
     def action_toggle_mode(self) -> None:
         self._mode = "fields" if self._mode == "messages" else "messages"

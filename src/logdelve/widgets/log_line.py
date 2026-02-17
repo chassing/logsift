@@ -114,11 +114,14 @@ def _render_compact_strip(
 
 
 def get_line_height(line: LogLine, expanded: bool) -> int:
-    """Get the display height of a line (1 for compact, N for expanded JSON)."""
-    if not expanded or line.content_type != ContentType.JSON or line.parsed_json is None:
+    """Get the display height of a line (1 for compact, N for expanded JSON, 2 for expanded text)."""
+    if not expanded:
         return 1
-    try:
-        formatted = json.dumps(line.parsed_json, indent=2, ensure_ascii=False)
-        return formatted.count("\n") + 1
-    except (TypeError, ValueError):
-        return 1
+    if line.content_type == ContentType.JSON and line.parsed_json is not None:
+        try:
+            formatted = json.dumps(line.parsed_json, indent=2, ensure_ascii=False)
+            return formatted.count("\n") + 1
+        except (TypeError, ValueError):
+            return 1
+    # Expanded text: compact line + full raw line below
+    return 2

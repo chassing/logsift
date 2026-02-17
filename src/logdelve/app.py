@@ -380,6 +380,15 @@ class LogDelveApp(App[None]):
         if not lines:
             self.notify("No lines to analyze", severity="warning")
             return
+        n = len(lines)
+        if n > 10000:
+            self.notify(f"Analyzing {n:,} lines...", timeout=2)
+        self.call_after_refresh(self._open_analyze, lines)
+
+    def _open_analyze(self, lines: list[LogLine] | None = None) -> None:
+        """Open the analyze dialog (deferred to show notification first)."""
+        if lines is None:
+            lines = self.query_one("#log-view", LogView)._lines
         self.push_screen(GroupsDialog(lines), callback=self._on_groups_result)
 
     def _on_groups_result(self, result: FilterRule | None) -> None:
