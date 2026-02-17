@@ -154,103 +154,17 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 
 ## Keybindings
 
-### Search
+| Key       | Action                   |     | Key       | Action                    |
+| --------- | ------------------------ | --- | --------- | ------------------------- |
+| `f` / `F` | Filter in / out          |     | `/` / `?` | Search forward / backward |
+| `e`       | Cycle level filter       |     | `n` / `N` | Next / previous match     |
+| `!`       | Toggle anomaly filter    |     | `j`       | Toggle JSON pretty-print  |
+| `x`       | Suspend / resume filters |     | `c`       | Cycle component display   |
+| `m`       | Manage filters           |     | `a`       | Analyze messages          |
+| `1`-`9`   | Toggle individual filter |     | `s`       | Session manager           |
+| `p`       | Pause / resume tailing   |     | `h`       | Help screen               |
 
-| Key | Action                                                |
-| --- | ----------------------------------------------------- |
-| /   | Search forward (opens dialog with regex/case options) |
-| ?   | Search backward                                       |
-| n   | Next match                                            |
-| N   | Previous match                                        |
-
-### Navigation
-
-| Key         | Action                    |
-| ----------- | ------------------------- |
-| Up / Down   | Move between log lines    |
-| PgUp / PgDn | Page up / down            |
-| Home / End  | Jump to first / last line |
-| gg          | Jump to first line        |
-| G           | Jump to last line         |
-
-### Display
-
-| Key   | Action                                            |
-| ----- | ------------------------------------------------- |
-| j     | Toggle pretty-print for ALL JSON lines            |
-| Enter | Toggle pretty-print for the current line (sticky) |
-| #     | Toggle line numbers                               |
-| c     | Cycle component display (tag / full / off)        |
-
-### Filtering
-
-| Key | Action                                                 |
-| --- | ------------------------------------------------------ |
-| f   | Filter in (text, key=value, or regex)                  |
-| F   | Filter out (text, key=value, or regex)                 |
-| e   | Cycle log level filter (ALL / ERROR / WARN / INFO)     |
-| !   | Toggle anomaly-only filter (with --baseline)           |
-| x   | Suspend/resume all filters (preserves cursor position) |
-| m   | Manage filters (toggle, edit, delete, clear, reorder)  |
-| 1-9 | Toggle individual filters on/off                       |
-
-### Analysis
-
-| Key | Action                                                |
-| --- | ----------------------------------------------------- |
-| a   | Analyze: message groups and field value distributions |
-
-In the analyze dialog: `m` mode (messages/fields), `s` sort, `r` reverse, Enter to filter.
-
-### Tailing
-
-| Key | Action                            |
-| --- | --------------------------------- |
-| p   | Pause/resume tailing              |
-| G   | Jump to bottom (follow new lines) |
-
-### Sessions & General
-
-| Key | Action                                       |
-| --- | -------------------------------------------- |
-| s   | Session manager (load, save, delete, rename) |
-| t   | Select theme                                 |
-| h   | Show help screen                             |
-| q   | Quit                                         |
-
-## Anomaly Detection
-
-Compare current logs against a known-good baseline to find what changed:
-
-```bash
-logdelve inspect --baseline good-day.log bad-day.log
-```
-
-- Lines with **new message patterns** (not seen in baseline) are marked with a red `▌` indicator
-- Anomaly filter is auto-enabled — press `!` to toggle between anomalies-only and all lines
-- Press `x` to temporarily suspend all filters and see context around an anomalous line
-- Use `a` (analyze) to see which message patterns are new
-
-## Log Format
-
-logdelve expects each line to begin with a timestamp, followed by either a JSON object or plain text:
-
-```text
-2024-01-15T10:30:00Z {"log_level": "info", "message": "Request processed", "duration_ms": 42}
-2024-01-15T10:30:01Z Connection established from 192.168.1.1
-Jan 15 10:30:02 myhost syslogd: restart
-[pod-name-abc123] 2024-01-15T10:30:00Z {"event": "start", "level": "info"}
-```
-
-Lines without a recognized timestamp are displayed as-is. Component prefixes (`[pod-name]`, `service |`) are stripped before timestamp parsing.
-
-## Sessions
-
-Filter sessions are stored in `~/.config/logdelve/sessions/` as TOML files. Filters are auto-saved on every change. Use `--session` to load a session on startup.
-
-## Configuration
-
-Theme preference is stored in `~/.config/logdelve/config.toml`. Press `t` to open the theme selection dialog.
+📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
 
 ## Development
 

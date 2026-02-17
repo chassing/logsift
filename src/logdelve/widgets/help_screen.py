@@ -40,6 +40,7 @@ HELP_TEXT = """\
   m                                     Manage filters (toggle, edit, delete, clear, reorder)
   x                                     Suspend/resume all filters
   e                                     Cycle log level filter (ALL → ERROR → WARN → INFO)
+  !                                     Toggle anomaly-only filter (with --baseline)
   1-9                                   Toggle individual filter on/off
 
   a                                     Analyze message groups

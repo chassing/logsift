@@ -5,9 +5,12 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+- [First Steps](#first-steps)
+- [Concepts](#concepts)
 - [UI Layout](#ui-layout)
 - [Log Level Detection](#log-level-detection)
 - [Component Detection](#component-detection)
+- [Supported Log Formats](#supported-log-formats)
 - [Navigation & Display](#navigation--display)
 - [Search](#search)
 - [Filtering](#filtering)
@@ -19,6 +22,8 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [AWS CloudWatch](#aws-cloudwatch)
 - [Time Parsing](#time-parsing)
 - [Themes](#themes)
+- [Integration Patterns](#integration-patterns)
+- [Troubleshooting](#troubleshooting)
 - [Keyboard Reference](#keyboard-reference)
 
 ---
@@ -49,6 +54,67 @@ kubectl logs deploy/my-app --since=1h | logdelve inspect
 # Download and view CloudWatch logs
 logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
 ```
+
+---
+
+## First Steps
+
+A guided walkthrough to get productive quickly.
+
+### 1. Open the sample log
+
+```bash
+logdelve inspect sample.log
+```
+
+You'll see the main TUI with three bars and a log view:
+
+- **Toolbar** (top): Shows available shortcuts and active filter/search status
+- **Log view** (center): Each line shows anomaly marker, level badge, component tag, timestamp, and content
+- **Status bar**: Line counts, error/warning counts (`E:n W:n`), anomaly count (`A:n`), file name
+- **Footer**: Session management, quit, help
+
+### 2. Try these 5 things
+
+1. **Navigate**: Use arrow keys (Up/Down) to move between lines, PgUp/PgDn to jump pages
+2. **Search**: Press `/`, type `error`, press Enter — matches are highlighted, use `n`/`N` to jump between them
+3. **Filter**: Press `f`, type a search term, press Enter — only matching lines are shown
+4. **Expand JSON**: Press `j` to pretty-print all JSON lines, or Enter to expand just the current line
+5. **Quit**: Press `q` to exit
+
+### 3. Understanding the status bar
+
+The status bar shows key counters at a glance:
+
+```text
+500 lines  E:12 W:3  A:2                                      app.log
+```
+
+- `500 lines`: Total number of visible lines (changes with active filters)
+- `E:12`: 12 error-level lines in the file
+- `W:3`: 3 warning-level lines
+- `A:2`: 2 anomalous lines (only with `--baseline`)
+
+### 4. Next steps
+
+- Add more filters with `f` (include) and `F` (exclude) — see [Filtering](#filtering)
+- Press `a` to analyze message patterns — see [Message Analysis](#message-analysis)
+- Press `e` to filter by log level (cycle: ALL → ERROR → WARN → INFO)
+- Press `x` to suspend all filters and see full context, `x` again to restore
+
+---
+
+## Concepts
+
+Key terms used throughout this guide:
+
+- **Log Line**: A single line of log output, parsed into timestamp + content (JSON or plain text) + metadata (level, component).
+- **Component**: The source system, pod, or service that produced a log line. Extracted from bracket prefixes (`[pod-name]`), Docker Compose prefixes (`service |`), Kubernetes prefixes, syslog hostnames, or JSON fields (`service`, `component`, `app`, `source`, `container`, `pod`).
+- **Template**: A normalized message pattern where variable parts (IPs, UUIDs, timestamps, numbers, paths) are replaced with tokens like `<IP>`, `<NUM>`, `<UUID>`, `<PATH>`, `<TS>`, `<HEX>`, `<STR>`. Used for grouping similar messages and anomaly detection.
+- **Baseline**: A known-good log file used as a comparison reference. Defines what "normal" looks like so that new or changed patterns can be identified.
+- **Anomaly Score**: A value indicating how unusual a message template is compared to the baseline. `1.0` = completely new template (not in baseline), `0.5` = significant frequency increase (>5x), `0.0` = known/normal.
+- **Filter Rule**: An include or exclude rule applied to log lines. Multiple include rules use OR logic (match any), multiple exclude rules use AND logic (excluded if any match).
+- **Session**: A named, saved set of filter rules, persisted as a TOML file in `~/.config/logdelve/sessions/`.
 
 ---
 
@@ -122,7 +188,7 @@ Each line gets a background color based on severity:
 
 Press `e` to cycle through minimum log level:
 
-```
+```text
 ALL → ERROR (only errors) → WARN+ → INFO+ → ALL
 ```
 
@@ -177,6 +243,49 @@ logdelve cloudwatch get /log/group prefix | logdelve inspect
 # Each line: [stream-name] 2024-01-15T10:30:00Z {"event": "..."}
 # → component = stream-name, timestamp parsed correctly
 ```
+
+---
+
+## Supported Log Formats
+
+logdelve auto-detects the format of each line. No configuration needed — all parsers are tried automatically.
+
+### Timestamp formats
+
+Parsers are tried in order for each line. The first successful match wins.
+
+| Parser            | Format                                 | Example                                                 |
+| ----------------- | -------------------------------------- | ------------------------------------------------------- |
+| ISO 8601          | `YYYY-MM-DDTHH:MM:SS[.fff][Z\|±HH:MM]` | `2024-01-15T10:30:00Z`, `2024-01-15T10:30:00.123+01:00` |
+| ISO 8601 (space)  | `YYYY-MM-DD HH:MM:SS[.fff]`            | `2024-01-15 10:30:00`                                   |
+| Slash-date        | `YYYY/MM/DD HH:MM:SS`                  | `2024/01/15 10:30:00`                                   |
+| Syslog (RFC 3164) | `Mon DD HH:MM:SS`                      | `Jan 15 10:30:00` (year = current year)                 |
+| Apache CLF        | `[DD/Mon/YYYY:HH:MM:SS ±HHMM]`         | `[15/Jan/2024:10:30:00 +0000]`                          |
+| Python logging    | `YYYY-MM-DD HH:MM:SS,fff`              | `2024-01-15 10:30:00,123` (comma before ms)             |
+| Journalctl        | JSON with `__REALTIME_TIMESTAMP`       | Microseconds since epoch                                |
+| Logfmt            | `time=` / `ts=` / `timestamp=`         | `ts=2024-01-15T10:30:00Z` or epoch seconds              |
+
+### Component prefix formats
+
+Component prefixes are stripped before timestamp parsing.
+
+| Format         | Pattern                                                                    | Example                                    |
+| -------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| Bracket        | `[name] TIMESTAMP ...`                                                     | `[pod-abc123] 2024-01-15T10:30:00Z ...`    |
+| Docker Compose | `service  \| TIMESTAMP ...`                                                | `web-service  \| 2024-01-15T10:30:00Z ...` |
+| Kubernetes     | `pod container TIMESTAMP ...`                                              | `my-pod-xyz api 2024-01-15T... ...`        |
+| Syslog         | `hostname program[pid]: msg`                                               | `myhost sshd[1234]: Accepted publickey`    |
+| JSON fields    | `service`, `component`, `app`, `source`, `container`, `pod`                | `{"service": "api-gw", ...}`               |
+| Logfmt         | `service=`, `component=`, `app=`, `source=`, `caller=`, `logger=`, `name=` | `service=api msg="ok"`                     |
+
+### Content types
+
+- **JSON**: Auto-detected when content starts with `{`. Parsed for structured field access, key-value filtering, and field analysis.
+- **Plain text**: Everything else. Supports level detection via text patterns and content heuristics.
+
+### Lines without timestamp
+
+Lines without a recognized timestamp are displayed as-is. No level badge, no timestamp column. They are still filterable and searchable.
 
 ---
 
@@ -288,6 +397,28 @@ Press `x` to suspend ALL active filters (rules, level, anomaly) at once. Press `
 
 The cursor stays on the same log line when toggling filters — the view centers on the current line.
 
+### Filtering recipes
+
+Common multi-step workflows:
+
+**Find all 500 errors in JSON logs:**
+Press `f`, type `status=500`, press Enter. This creates a JSON key-value filter matching lines where the `status` field equals `500`.
+
+**Show only two specific pods:**
+Press `f`, type the first pod name, press Enter. Press `f` again, type the second pod name, press Enter. Both are include filters — OR logic shows lines from either pod.
+
+**Hide health checks and metrics noise:**
+Press `F` (filter out), type `/health`, press Enter. Press `F` again, type `/metrics`, press Enter. Both are exclude filters — AND logic hides lines matching either pattern.
+
+**Filter from analysis:**
+Press `a` to open analysis, select a message group, press Enter to create a filter matching those lines. Then add more filters to narrow down further.
+
+**Compare error patterns against baseline:**
+Use `--baseline` to load a known-good file, then press `a` to see which message templates are new. Press `!` to toggle anomaly-only view.
+
+**Quick context check:**
+Press `x` to suspend all filters and see surrounding lines. Review the context. Press `x` again to restore all filters exactly as before.
+
 ---
 
 ## Filter Management
@@ -362,7 +493,7 @@ Press `m` to switch to field analysis. Shows JSON field value distributions:
 
 ## Anomaly Detection
 
-![Anomaly demo](screenshots/hero-anomaly.gif)
+![Anomaly demo](screenshots/anomaly.gif)
 
 Compare current logs against a known-good baseline to find what changed.
 
@@ -523,6 +654,93 @@ All times are interpreted as UTC.
 Press `t` to open the theme selection dialog. All built-in Textual themes are available.
 
 The selected theme is persisted in `~/.config/logdelve/config.toml` and restored on next launch.
+
+---
+
+## Integration Patterns
+
+logdelve's CloudWatch commands output to stdout, making them scriptable and composable with pipes.
+
+### Download and analyze
+
+```bash
+# Download logs and immediately inspect
+logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
+
+# Download, save, and inspect
+logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h > incident.log
+logdelve inspect incident.log
+```
+
+### Baseline comparison workflow
+
+```bash
+# Step 1: Create a baseline from a known-good period
+logdelve cloudwatch get /aws/ecs/my-service prefix \
+  -s "yesterday 6:00" -e "yesterday 18:00" > baseline.log
+
+# Step 2: Download current logs
+logdelve cloudwatch get /aws/ecs/my-service prefix -s 2h > current.log
+
+# Step 3: Compare — anomaly filter is auto-enabled
+logdelve inspect --baseline baseline.log current.log
+```
+
+### Pre-built sessions for recurring investigations
+
+Create a TOML session file in `~/.config/logdelve/sessions/` for common filter sets, then load on startup:
+
+```bash
+logdelve inspect --session error-hunting app.log
+```
+
+See [Sessions](#sessions) for the TOML format.
+
+### Pipeline examples
+
+```bash
+# Kubernetes: multi-pod logs with component detection
+kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
+
+# Docker Compose: follow all services
+docker compose logs -f | logdelve inspect
+
+# Combine multiple files
+cat service-a.log service-b.log | logdelve inspect
+
+# Scheduled download with time range
+logdelve cloudwatch get /aws/ecs/my-service prefix \
+  -s "today 6:00" -e "today 12:00" > morning.log
+```
+
+---
+
+## Troubleshooting
+
+**I pipe logs, but the keyboard doesn't respond.**
+logdelve reads keyboard input from `/dev/tty` when stdin is used for log data. This doesn't work in environments without a TTY (e.g., CI pipelines, `cron` jobs). Use file-based input instead: save to a file first, then `logdelve inspect file.log`.
+
+**My timestamps are not recognized.**
+logdelve supports ISO 8601, Syslog (RFC 3164), Apache CLF, Python logging, Journalctl, Logfmt, and slash-date formats. See [Supported Log Formats](#supported-log-formats) for the full list. Timestamps must appear at the beginning of the line (after an optional component prefix).
+
+**CloudWatch commands fail with ImportError.**
+The AWS dependencies are optional. Install with AWS support:
+
+```bash
+uv tool install logdelve[aws]
+```
+
+**Lines without timestamps are shown — is that normal?**
+Yes. Lines without a recognized timestamp are displayed as-is, without a level badge or timestamp column. They are still searchable and filterable.
+
+**Anomaly detection finds 0 anomalies.**
+Templates are compared, not exact lines. If only variable parts change (IPs, timestamps, UUIDs), the templates stay the same and won't be flagged. Anomalies are detected when entirely new message patterns appear or existing patterns spike >5x in frequency.
+
+**How large can a log file be?**
+logdelve uses virtual rendering — display performance is constant regardless of file size. Parsing is linear (all lines are parsed on load). For very large files, use `--no-tail` to skip automatic tailing.
+
+**The `!` key does nothing.**
+The anomaly filter requires `--baseline`. Without a baseline file, there are no anomalies to filter. Usage: `logdelve inspect --baseline good.log current.log`.
 
 ---
 
