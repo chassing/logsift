@@ -49,7 +49,7 @@ def _setup_pipe_input() -> int:
 def inspect(
     file: Annotated[Path | None, typer.Argument(help="Log file to view")] = None,
     session: Annotated[str | None, typer.Option("--session", "-s", help="Load a saved filter session")] = None,
-    no_tail: Annotated[bool, typer.Option("--no-tail", help="Disable automatic tailing")] = False,  # noqa: FBT002
+    tail: Annotated[bool, typer.Option("--tail", "-t", help="Tail the log file (follow new lines)")] = False,  # noqa: FBT002
     baseline: Annotated[
         Path | None, typer.Option("--baseline", "-b", help="Baseline log file for anomaly detection")
     ] = None,
@@ -68,7 +68,6 @@ def inspect(
 
     log_parser = _resolve_parser(parser, file)
     pipe = is_pipe() if file is None else False
-    tail = not no_tail
     pipe_fd: int | None = None
 
     if file is not None:

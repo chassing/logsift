@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label, OptionList
 from textual.widgets.option_list import Option
@@ -105,7 +106,7 @@ class FilterDialog(ModalScreen[FilterRule | None]):
             ol = self.query_one("#json-keys", OptionList)
             if ol.option_count > 0:
                 ol.highlighted = 0
-        except (ValueError, KeyError):
+        except NoMatches:
             pass
 
     def on_key(self, event: Key) -> None:

@@ -51,7 +51,7 @@ HELP_TEXT = """\
   p                                     Pause/resume tailing
   G                                     Jump to bottom (follow new lines)
 
-  Tailing is on by default. Use --no-tail to disable.
+  Use --tail to follow a growing file. Pipe input is tailed automatically.
 
 [bold]Sessions[/bold]
   s                                     Session manager (load, save, delete, rename)

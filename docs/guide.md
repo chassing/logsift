@@ -430,16 +430,17 @@ logdelve inspect --session my-filters app.log
 
 ## Live Tailing
 
-By default, logdelve tails log files (like `tail -f`). New lines appear at the bottom.
+When reading from a file, logdelve loads the entire file. Use `--tail` to follow new lines (like `tail -f`).
+Pipe input is always tailed automatically.
 
 ```bash
-# Tail a growing log file
+# Read file once (default)
 logdelve inspect app.log
 
-# Disable tailing (read file once)
-logdelve inspect --no-tail app.log
+# Tail a growing log file
+logdelve inspect --tail app.log
 
-# Pipe and tail
+# Pipe: auto-tail
 kubectl logs -f deploy/my-app | logdelve inspect
 ```
 
