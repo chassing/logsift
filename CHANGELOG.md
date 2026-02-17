@@ -22,11 +22,17 @@ All notable changes to this project will be documented in this file.
 - **CloudWatch stream names**: `[stream-name]` prefix in cloudwatch get output
 - **Flexible time parsing**: `dateparser` integration for natural language dates ("yesterday at 8am", "friday", "2 days ago", "Feb 13 2026 7:58")
 - **Compact timestamp**: HH:MM:SS instead of full ISO in log view
+- **Parser plugins**: pluggable log format parsers with auto-detection — ISO 8601, syslog, Apache CLF, Docker Compose, Kubernetes, journalctl, Python logging, logfmt
+- **Format selection**: `--parser/-p` option to force a specific log format
+- **Syslog component extraction**: hostname and program name (`program[pid]`) from syslog lines
+- **Text expand**: Enter on text lines shows full raw line below the compact view
+- **Level heuristics**: detect ERROR/WARN from keywords (fail, refused, timeout, deprecated) when no explicit level
 
 ### Changed
 
+- **Tailing default**: files are read once by default, use `--tail/-t` to follow new lines; pipe input tails automatically (was: tailing on by default with `--no-tail` to disable)
 - **CloudWatch output**: includes stream name as `[stream-name]` prefix for component detection
-- **Parser**: strips component prefix before timestamp extraction
+- **Default log level**: lines with timestamp but no detected level default to INFO
 - **Filter bar**: always visible toolbar replaces hidden filter-only bar
 - **Filter manager**: shows case-sensitive indicator `[Aa]`
 - **README**: rewritten with use cases, outage investigation workflow, CloudWatch examples
@@ -78,7 +84,7 @@ All notable changes to this project will be documented in this file.
 - **Session management**: `s` dialog to load, save, delete, rename filter sessions
 - **Auto-save**: filters automatically saved as timestamped sessions
 - **CLI session loading**: `--session/-s` flag to load filters on startup
-- **Live tailing**: auto-tail for files and pipe input with `--no-tail` to disable
+- **Live tailing**: `--tail/-t` for files, auto-tail for pipe input
 - **Pause/resume**: `p` to pause tailing, buffer new lines, resume to flush
 - **Pipe input**: progressive loading via fd duplication, Textual keyboard support preserved
 - **vim navigation**: `gg` for top, `G` for bottom
