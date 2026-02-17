@@ -29,8 +29,8 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 # Install with uv (recommended)
 uv tool install logdelve
 
-# No uv? Install it first
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# No uv? Install both in one step:
+curl -LsSf uvx.sh/logdelve/install.sh | sh
 
 # Alternative: pip
 pip install logdelve
@@ -456,7 +456,7 @@ When paused, the status bar shows the count of buffered new lines. Pressing `p` 
 
 ## AWS CloudWatch
 
-Requires `pip install logdelve[aws]`.
+Requires `uv tool install logdelve[aws]`.
 
 ### Commands
 
