@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from textual.app import ComposeResult
-from textual.binding import BindingType
 from textual.containers import Horizontal, Vertical
-from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label, OptionList
 from textual.widgets.option_list import Option
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
+    from textual.events import Key
 
 from logdelve.filters import flatten_json
 from logdelve.models import FilterRule, FilterType
@@ -103,7 +105,7 @@ class FilterDialog(ModalScreen[FilterRule | None]):
             ol = self.query_one("#json-keys", OptionList)
             if ol.option_count > 0:
                 ol.highlighted = 0
-        except Exception:
+        except (ValueError, KeyError):
             pass
 
     def on_key(self, event: Key) -> None:
@@ -125,7 +127,7 @@ class FilterDialog(ModalScreen[FilterRule | None]):
             )
             self.dismiss(rule)
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    def on_input_submitted(self, _event: Input.Submitted) -> None:
         self._submit_filter()
 
     def _submit_filter(self) -> None:

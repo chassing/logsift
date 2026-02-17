@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, override
 
 from rich.text import Text
-from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
 
 from logdelve.models import FilterRule, FilterType
 
@@ -73,6 +76,7 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         self._filters = [r.model_copy() for r in filters]
         self._editing_idx: int | None = None
 
+    @override
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label("Manage filters", classes="title")
@@ -95,7 +99,8 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         if highlighted is not None and self._filters:
             ol.highlighted = min(highlighted, len(self._filters) - 1)
 
-    def _format_rule(self, index: int, rule: FilterRule) -> Text:
+    @staticmethod
+    def _format_rule(index: int, rule: FilterRule) -> Text:
         text = Text()
         text.append(f"[{index + 1}] ", style="dim")
 

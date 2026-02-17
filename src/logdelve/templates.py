@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from logdelve.models import LogLevel, LogLine
+if TYPE_CHECKING:
+    from logdelve.models import LogLevel, LogLine
+
+_MAX_PREVIEW_KEYS = 5
+_MIN_FILTER_VALUE_LEN = 3
+_MAX_FIELD_VALUE_LEN = 50
+_MAX_FIELD_CARDINALITY = 20
 
 # Tokenization patterns (order matters: more specific first)
 _UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
@@ -18,7 +24,7 @@ _NUM_RE = re.compile(r"-?\d+\.?\d*")
 _QUOTED_RE = re.compile(r'"[^"]*"')
 
 
-def extract_template(content: str, is_json: bool = False, parsed_json: dict[str, Any] | None = None) -> str:
+def extract_template(content: str, *, is_json: bool = False, parsed_json: dict[str, Any] | None = None) -> str:
     """Replace variable parts of a log message with tokens.
 
     For JSON lines with parsed data, uses key-structure-based templating.
@@ -42,8 +48,7 @@ def _tokenize_text(text: str) -> str:
     result = _IPV4_RE.sub("<IP>", result)
     result = _PATH_RE.sub("<PATH>", result)
     result = _HEX_RE.sub("<HEX>", result)
-    result = _NUM_RE.sub("<NUM>", result)
-    return result
+    return _NUM_RE.sub("<NUM>", result)
 
 
 def _extract_json_template(data: dict[str, Any]) -> str:
@@ -88,8 +93,8 @@ def _json_display(data: dict[str, Any]) -> str:
     if event_text:
         return event_text
     # Fallback: show first few key names
-    keys = sorted(data.keys())[:5]
-    suffix = f" +{len(data) - 5}" if len(data) > 5 else ""
+    keys = sorted(data.keys())[:_MAX_PREVIEW_KEYS]
+    suffix = f" +{len(data) - _MAX_PREVIEW_KEYS}" if len(data) > _MAX_PREVIEW_KEYS else ""
     return f"{{{', '.join(keys)}{suffix}}}"
 
 
@@ -104,7 +109,7 @@ def _json_filter_pattern(data: dict[str, Any]) -> str:
             return _tokenize_text(data[key])
     # Fallback: use first recognizable string value
     for key in sorted(data.keys()):
-        if isinstance(data[key], str) and len(data[key]) > 3:
+        if isinstance(data[key], str) and len(data[key]) > _MIN_FILTER_VALUE_LEN:
             return _tokenize_text(data[key])
     return ""
 
@@ -146,7 +151,7 @@ def build_template_groups(lines: list[LogLine]) -> list[MessageTemplate]:
 
     Returns templates sorted by count (descending).
     """
-    from logdelve.models import ContentType
+    from logdelve.models import ContentType  # noqa: PLC0415
 
     groups: dict[str, MessageTemplate] = {}
 
@@ -181,8 +186,7 @@ def template_to_regex(template: str) -> str:
     escaped = escaped.replace(re.escape("<HEX>"), r"[0-9a-f]{8,}")
     escaped = escaped.replace(re.escape("<NUM>"), r"-?\d+\.?\d*")
     escaped = escaped.replace(re.escape("<STR>"), r".+?")
-    escaped = escaped.replace(re.escape("<BOOL>"), r"(?:true|false)")
-    return escaped
+    return escaped.replace(re.escape("<BOOL>"), r"(?:true|false)")
 
 
 class FieldGroup:
@@ -220,7 +224,7 @@ _SKIP_FIELD_KEYS = frozenset(
 )
 
 
-def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:
+def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:  # noqa: C901
     """Analyze JSON field values across all lines.
 
     - String/bool fields: group by exact value
@@ -228,7 +232,7 @@ def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:
     - Float fields: skipped
     - High-cardinality string keys (>20 values): skipped
     """
-    from logdelve.models import ContentType
+    from logdelve.models import ContentType  # noqa: PLC0415
 
     groups: dict[str, FieldGroup] = {}
     key_values: dict[str, set[str]] = {}
@@ -243,7 +247,7 @@ def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:
                 continue
             if isinstance(value, float):
                 continue
-            if isinstance(value, str) and len(value) > 50:
+            if isinstance(value, str) and len(value) > _MAX_FIELD_VALUE_LEN:
                 continue
 
             # Integer fields: group as =0 / >0
@@ -264,7 +268,7 @@ def build_field_groups(lines: list[LogLine]) -> list[FieldGroup]:
                 groups[group_key].add_line(i)
 
     # Filter out high-cardinality string keys (>20 values)
-    high_cardinality = {k for k, v in key_values.items() if len(v) > 20}
+    high_cardinality = {k for k, v in key_values.items() if len(v) > _MAX_FIELD_CARDINALITY}
     all_groups = [g for g in groups.values() if g.key not in high_cardinality]
 
     # Filter out fields that appear in every line

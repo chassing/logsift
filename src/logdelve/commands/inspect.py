@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
-from typing import Annotated
+from pathlib import Path  # noqa: TC003 - typer needs this at runtime for argument parsing
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from logdelve.parsers import ParserName, detect_parser, get_parser
-from logdelve.parsers.base import LogParser
 from logdelve.reader import is_pipe, read_file
+
+if TYPE_CHECKING:
+    from logdelve.parsers.base import LogParser
 
 
 def _resolve_parser(parser_name: ParserName, file: Path | None) -> LogParser:
@@ -47,7 +49,7 @@ def _setup_pipe_input() -> int:
 def inspect(
     file: Annotated[Path | None, typer.Argument(help="Log file to view")] = None,
     session: Annotated[str | None, typer.Option("--session", "-s", help="Load a saved filter session")] = None,
-    no_tail: Annotated[bool, typer.Option("--no-tail", help="Disable automatic tailing")] = False,
+    no_tail: Annotated[bool, typer.Option("--no-tail", help="Disable automatic tailing")] = False,  # noqa: FBT002
     baseline: Annotated[
         Path | None, typer.Option("--baseline", "-b", help="Baseline log file for anomaly detection")
     ] = None,
@@ -80,7 +82,7 @@ def inspect(
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
 
-    from logdelve.app import LogDelveApp
+    from logdelve.app import LogDelveApp  # noqa: PLC0415
 
     log_app = LogDelveApp(
         lines=lines,

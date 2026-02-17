@@ -1,5 +1,6 @@
 """Docker Compose log format parser."""
 
+# ruff: noqa: PLC0415
 from __future__ import annotations
 
 import re

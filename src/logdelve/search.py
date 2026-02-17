@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
-from logdelve.models import LogLine, SearchQuery
+if TYPE_CHECKING:
+    from logdelve.models import LogLine, SearchQuery
 
 
 def find_matches(lines: list[LogLine], query: SearchQuery) -> list[tuple[int, int, int]]:
@@ -18,8 +20,7 @@ def find_matches(lines: list[LogLine], query: SearchQuery) -> list[tuple[int, in
         except re.error:
             return results
         for i, line in enumerate(lines):
-            for m in pattern.finditer(line.raw):
-                results.append((i, m.start(), m.end()))
+            results.extend((i, m.start(), m.end()) for m in pattern.finditer(line.raw))
     else:
         text_pattern = query.pattern if query.case_sensitive else query.pattern.lower()
         pat_len = len(text_pattern)

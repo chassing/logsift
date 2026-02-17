@@ -25,7 +25,9 @@ _TIME_UNITS: dict[str, str] = {
 
 
 def parse_time(value: str) -> datetime:
-    """Parse time value. Supports:
+    """Parse time value.
+
+    Supports:
     - Relative shorthand: 5m, 1h, 2d, 30s, 1week
     - Natural language: "last friday", "2 days ago", "yesterday 7:58"
     - Time only: 7:55, 14:30:00 (today in UTC)

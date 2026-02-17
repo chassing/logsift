@@ -10,6 +10,7 @@ from logdelve.parsers.base import (
     classify_content,
     extract_log_level,
 )
+from logdelve.parsers.iso import IsoParser
 
 # Kubernetes/CloudWatch bracket: "[pod-name-abc123]"
 _K8S_BRACKET_RE = re.compile(r"^\[(?P<comp>[a-z0-9][\w.-]+)\]\s*")
@@ -30,7 +31,6 @@ class KubernetesParser(LogParser):
         return "Kubernetes kubectl logs ([pod-name] or pod container timestamp)"
 
     def __init__(self) -> None:
-        from logdelve.parsers.iso import IsoParser
 
         self._iso_parser = IsoParser()
 

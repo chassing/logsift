@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from logdelve.models import ContentType
 from logdelve.parsers.base import (
@@ -27,6 +27,9 @@ _MSG_KEYS = ("msg", "message", "error", "err")
 # Keys that contain the component
 _COMP_KEYS = ("service", "component", "app", "source", "caller", "logger", "name")
 
+_MIN_LOGFMT_PAIRS = 2
+_EPOCH_MS_THRESHOLD = 1e12
+
 
 class LogfmtParser(LogParser):
     """Parses logfmt structured logs (key=value pairs).
@@ -42,16 +45,16 @@ class LogfmtParser(LogParser):
     def description(self) -> str:
         return "logfmt key=value structured logs"
 
-    def try_parse(self, raw: str) -> ParseResult | None:
+    def try_parse(self, raw: str) -> ParseResult | None:  # noqa: C901, PLR0912
         pairs = _LOGFMT_PAIR_RE.findall(raw)
         # Need at least 2 key=value pairs to be considered logfmt
-        if len(pairs) < 2:
+        if len(pairs) < _MIN_LOGFMT_PAIRS:
             return None
 
         # Build a dict from parsed pairs
         data: dict[str, str] = {}
         for key, qval, val in pairs:
-            data[key] = qval if qval else val
+            data[key] = qval or val
 
         # Must have a time-like key to be recognized as logfmt
         timestamp = None
@@ -98,19 +101,20 @@ class LogfmtParser(LogParser):
             component=component,
         )
 
-    def _parse_timestamp(self, value: str) -> datetime | None:
+    @staticmethod
+    def _parse_timestamp(value: str) -> datetime | None:
         """Parse a timestamp value from a logfmt field."""
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return datetime.fromisoformat(value)
         except ValueError:
             pass
         # Try epoch seconds/milliseconds
         try:
             num = float(value)
-            if num > 1e12:
+            if num > _EPOCH_MS_THRESHOLD:
                 # Milliseconds
-                return datetime.utcfromtimestamp(num / 1000)
-            return datetime.utcfromtimestamp(num)
+                return datetime.fromtimestamp(num / 1000, tz=UTC)
+            return datetime.fromtimestamp(num, tz=UTC)
         except (ValueError, OSError):
             pass
         return None

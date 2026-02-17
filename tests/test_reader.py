@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from io import StringIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from logdelve.models import ContentType
 from logdelve.reader import is_pipe, read_file, read_stdin

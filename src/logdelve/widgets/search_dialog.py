@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
+    from textual.events import Key
 
 from logdelve.models import SearchDirection, SearchQuery
 
@@ -83,7 +86,7 @@ class SearchDialog(ModalScreen[SearchQuery | None]):
             event.stop()
             self._submit_search()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    def on_input_submitted(self, _event: Input.Submitted) -> None:
         self._submit_search()
 
     def _submit_search(self) -> None:

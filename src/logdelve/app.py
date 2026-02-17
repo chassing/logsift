@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
@@ -16,7 +14,6 @@ from textual.worker import get_current_worker
 from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
 from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
-from logdelve.parsers.base import LogParser
 from logdelve.reader import read_file, read_file_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
@@ -26,12 +23,19 @@ from logdelve.widgets.groups_dialog import GroupsDialog
 from logdelve.widgets.help_screen import HelpScreen
 from logdelve.widgets.log_view import LogView
 from logdelve.widgets.search_dialog import SearchDialog
-from logdelve.widgets.session_dialog import SessionAction, SessionManageDialog
+from logdelve.widgets.session_dialog import SessionAction, SessionActionType, SessionManageDialog
 from logdelve.widgets.status_bar import StatusBar
 from logdelve.widgets.theme_dialog import ThemeDialog
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from pathlib import Path
 
-class LogDelveApp(App[None]):
+    from logdelve.parsers.base import LogParser
+_ANALYZE_LINE_THRESHOLD = 10_000
+
+
+class LogDelveApp(App[None]):  # noqa: PLR0904
     """Log viewer TUI application."""
 
     CSS_PATH = "styles/app.tcss"
@@ -71,6 +75,7 @@ class LogDelveApp(App[None]):
         source: str = "",
         session_name: str | None = None,
         file_path: Path | None = None,
+        *,
         tail: bool = False,
         pipe_fd: int | None = None,
         baseline_path: Path | None = None,
@@ -113,7 +118,7 @@ class LogDelveApp(App[None]):
         status_bar = self.query_one("#status-bar", StatusBar)
 
         if os.environ.get("LOGDELVE_DEMO"):
-            from logdelve.widgets.demo_overlay import setup_demo
+            from logdelve.widgets.demo_overlay import setup_demo  # noqa: PLC0415
 
             setup_demo(self)
 
@@ -143,12 +148,12 @@ class LogDelveApp(App[None]):
                 self.notify("No anomalies found")
 
         if self._tail and self._file_path:
-            status_bar.set_tailing(True)
+            status_bar.set_tailing(tailing=True)
             self.run_worker(
                 self._tail_worker(read_file_async(self._file_path, tail=True, parser=self._parser)), exclusive=True
             )
         elif self._pipe_fd is not None:
-            status_bar.set_tailing(True)
+            status_bar.set_tailing(tailing=True)
             self.run_worker(self._tail_worker(read_pipe_async(self._pipe_fd, parser=self._parser)), exclusive=True)
 
         self._update_status_bar()
@@ -176,14 +181,14 @@ class LogDelveApp(App[None]):
         status_bar = self.query_one("#status-bar", StatusBar)
 
         if self._tail_paused:
-            status_bar.set_tailing(False)
+            status_bar.set_tailing(tailing=False)
             self.notify("Tailing paused")
         else:
             log_view = self.query_one("#log-view", LogView)
             for line in self._tail_buffer:
                 log_view.append_line(line)
             self._tail_buffer.clear()
-            status_bar.set_tailing(True)
+            status_bar.set_tailing(tailing=True)
             status_bar.set_new_lines(0)
             self._update_status_bar()
             self.notify("Tailing resumed")
@@ -201,9 +206,9 @@ class LogDelveApp(App[None]):
         filter_bar.set_level_info(self._min_level, has_levels=bool(level_counts))
         if self._anomaly_result:
             status_bar.set_anomaly_count(self._anomaly_result.anomaly_count)
-            filter_bar.set_anomaly_info(self._anomaly_result.anomaly_count, log_view._anomaly_filter)
+            filter_bar.set_anomaly_info(self._anomaly_result.anomaly_count, filter_active=log_view.anomaly_filter)
 
-    def _update_search_status(self) -> None:
+    def update_search_status(self) -> None:
         """Update status bar with current search match info."""
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
@@ -236,7 +241,7 @@ class LogDelveApp(App[None]):
     def _get_current_json_data(self) -> dict[str, Any] | None:
         """Get JSON data from the current cursor line, if it's a JSON line."""
         log_view = self.query_one("#log-view", LogView)
-        visible = log_view._lines
+        visible = log_view.lines
         if not visible:
             return None
         line = visible[log_view.cursor_line]
@@ -264,7 +269,7 @@ class LogDelveApp(App[None]):
         filter_bar.set_search_text(result.pattern)
         log_view = self.query_one("#log-view", LogView)
         log_view.set_search(result)
-        self._update_search_status()
+        self.update_search_status()
 
     # --- Filter actions ---
 
@@ -300,7 +305,7 @@ class LogDelveApp(App[None]):
     def action_toggle_all_filters(self) -> None:
         """Suspend/resume ALL filters (rules, level, anomaly) preserving cursor line."""
         log_view = self.query_one("#log-view", LogView)
-        orig_idx = log_view._cursor_orig_index()
+        orig_idx = log_view.cursor_orig_index()
 
         if self._filters_suspended:
             # Restore everything
@@ -308,28 +313,28 @@ class LogDelveApp(App[None]):
             self._suspended_rules = []
             self._min_level = self._suspended_level
             self._suspended_level = None
-            log_view._anomaly_filter = self._suspended_anomaly
+            log_view.anomaly_filter = self._suspended_anomaly
             self._suspended_anomaly = False
             self._filters_suspended = False
-            log_view._min_level = self._min_level
+            log_view.min_level = self._min_level
             self._apply_filters()
-            log_view._restore_cursor(orig_idx)
+            log_view.restore_cursor(orig_idx)
             self.notify("Filters restored")
         else:
             # Suspend everything
-            has_anything = bool(self._filter_rules) or self._min_level is not None or log_view._anomaly_filter
+            has_anything = bool(self._filter_rules) or self._min_level is not None or log_view.anomaly_filter
             if not has_anything:
                 return
             self._suspended_rules = list(self._filter_rules)
             self._suspended_level = self._min_level
-            self._suspended_anomaly = log_view._anomaly_filter
+            self._suspended_anomaly = log_view.anomaly_filter
             self._filter_rules = []
             self._min_level = None
-            log_view._anomaly_filter = False
+            log_view.anomaly_filter = False
             self._filters_suspended = True
-            log_view._min_level = None
+            log_view.min_level = None
             self._apply_filters()
-            log_view._restore_cursor(orig_idx)
+            log_view.restore_cursor(orig_idx)
             self.notify("All filters suspended")
 
         self._update_status_bar()
@@ -342,7 +347,7 @@ class LogDelveApp(App[None]):
     def _on_session_result(self, result: SessionAction | None) -> None:
         if result is None:
             return
-        if result.action == "load":
+        if result.action == SessionActionType.LOAD:
             try:
                 session = load_session(result.name)
             except FileNotFoundError:
@@ -352,7 +357,7 @@ class LogDelveApp(App[None]):
             self._filter_rules = list(session.filters)
             self._apply_filters()
             self.notify(f"Session '{result.name}' loaded")
-        elif result.action == "save":
+        elif result.action == SessionActionType.SAVE:
             if not self._filter_rules:
                 self.notify("No filters to save", severity="warning")
                 return
@@ -371,7 +376,7 @@ class LogDelveApp(App[None]):
         log_view = self.query_one("#log-view", LogView)
         log_view.toggle_anomaly_filter()
         self._update_status_bar()
-        if log_view._anomaly_filter:
+        if log_view.anomaly_filter:
             self.notify("Showing anomalies only")
         else:
             self.notify("Showing all lines")
@@ -381,12 +386,12 @@ class LogDelveApp(App[None]):
     def action_analyze(self) -> None:
         """Open message group analysis dialog."""
         log_view = self.query_one("#log-view", LogView)
-        lines = log_view._lines
+        lines = log_view.lines
         if not lines:
             self.notify("No lines to analyze", severity="warning")
             return
         n = len(lines)
-        if n > 10000:
+        if n > _ANALYZE_LINE_THRESHOLD:
             self.notify(f"Analyzing {n:,} lines...", timeout=3)
             self.set_timer(0.1, lambda: self._open_analyze(lines))
         else:
@@ -395,7 +400,7 @@ class LogDelveApp(App[None]):
     def _open_analyze(self, lines: list[LogLine] | None = None) -> None:
         """Open the analyze dialog (deferred to show notification first)."""
         if lines is None:
-            lines = self.query_one("#log-view", LogView)._lines
+            lines = self.query_one("#log-view", LogView).lines
         self.push_screen(GroupsDialog(lines), callback=self._on_groups_result)
 
     def _on_groups_result(self, result: FilterRule | None) -> None:
@@ -437,7 +442,7 @@ class LogDelveApp(App[None]):
 
     def action_save_screenshot_svg(self) -> None:
         """Save a screenshot as SVG to docs/screenshots/."""
-        from pathlib import Path
+        from pathlib import Path  # noqa: PLC0415
 
         out_dir = Path("docs/screenshots")
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -458,7 +463,7 @@ class LogDelveApp(App[None]):
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
 
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+    def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
         """Hide pause binding when not streaming."""
         if action == "toggle_tail_pause":
             return True if self._is_streaming else None

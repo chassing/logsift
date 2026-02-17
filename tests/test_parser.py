@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from logdelve.models import ContentType, LogLevel
-from logdelve.parser import classify_content, extract_component, extract_log_level, extract_timestamp, parse_line
+from logdelve.parser import extract_component, extract_timestamp, parse_line
+from logdelve.parsers.base import classify_content, extract_log_level
 
 
 class TestExtractTimestamp:

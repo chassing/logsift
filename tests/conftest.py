@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
-    pass
+    from pathlib import Path
 
 SAMPLE_LINES = [
     '2024-01-15T10:30:00Z {"log_level": "info", "message": "Server started", "port": 8080}',

@@ -78,7 +78,7 @@ def _matches_json_key(line: LogLine, rule: FilterRule) -> bool:
     return str(value) == rule.json_value
 
 
-def get_nested_value(data: dict[str, Any], key_path: str) -> Any:
+def get_nested_value(data: dict[str, Any], key_path: str) -> Any:  # noqa: ANN401
     """Get a value from nested dicts using dot-separated key path."""
     keys = key_path.split(".")
     current: Any = data

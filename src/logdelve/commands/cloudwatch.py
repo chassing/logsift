@@ -62,7 +62,7 @@ def get_logs(
     stream_prefix: Annotated[str, typer.Argument(help="Log stream name prefix")] = "",
     start: Annotated[str, typer.Option("--start", "-s", help="Start time in UTC (5m, 1h, 2days, or ISO 8601)")] = "5m",
     end: Annotated[str | None, typer.Option("--end", "-e", help="End time in UTC (default: now)")] = None,
-    tail: Annotated[bool, typer.Option("--tail", help="Keep polling for new events")] = False,
+    tail: Annotated[bool, typer.Option("--tail", help="Keep polling for new events")] = False,  # noqa: FBT002
     message_key: Annotated[
         str | None, typer.Option("--message-key", "-m", help="Extract nested JSON key from message (default: message)")
     ] = "message",
@@ -81,7 +81,7 @@ def get_logs(
 
     events = get_log_events(client, log_group, stream_prefix, start_time, end_time, message_key=message_key)
     for ts, msg, stream in events:
-        print(f"[{stream}] {ts} {msg}", flush=tail)
+        print(f"[{stream}] {ts} {msg}", flush=tail)  # noqa: T201
 
     if tail:
         tail_log_events(client, log_group, stream_prefix, end_time, message_key=message_key)
@@ -100,7 +100,7 @@ def groups(
     """List CloudWatch log groups."""
     client = _client(aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url)
     for name in list_log_groups(client, prefix=log_group_prefix):
-        print(name)
+        print(name)  # noqa: T201
 
 
 @cw_app.command("streams")
@@ -117,4 +117,4 @@ def streams(
     """List CloudWatch log streams."""
     client = _client(aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url)
     for name in list_log_streams(client, log_group, prefix=prefix):
-        print(name)
+        print(name)  # noqa: T201

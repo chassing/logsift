@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.text import Text
-from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
 
 
 class ThemeDialog(ModalScreen[str | None]):
@@ -54,7 +57,7 @@ class ThemeDialog(ModalScreen[str | None]):
         super().__init__()
         self._current_theme = current_theme
 
-    def compose(self) -> ComposeResult:
+    def compose(self) -> ComposeResult:  # noqa: PLR6301
         with Vertical():
             yield Label("🎨 Select theme", classes="title")
             yield OptionList(id="theme-list")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import override
 
 from logdelve.parsers.base import (
     LogParser,
@@ -27,7 +28,6 @@ _MONTH_MAP: dict[str, int] = {
     "Dec": 12,
 }
 
-# Syslog: "Jan 15 10:30:00" or "Jan  5 10:30:00"
 _SYSLOG_RE = re.compile(
     r"^(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(?P<day>\d{1,2})\s+"
     r"(?P<hour>\d{2}):(?P<min>\d{2}):(?P<sec>\d{2})\s+"
@@ -48,6 +48,7 @@ class SyslogParser(LogParser):
     def description(self) -> str:
         return "Syslog RFC 3164 (Mon DD HH:MM:SS hostname program: msg)"
 
+    @override
     def try_parse(self, raw: str) -> ParseResult | None:
         m = _SYSLOG_RE.match(raw)
         if m is None:
@@ -60,6 +61,7 @@ class SyslogParser(LogParser):
             hour=int(m.group("hour")),
             minute=int(m.group("min")),
             second=int(m.group("sec")),
+            tzinfo=UTC,
         )
         content = raw[m.end() :]
         # Extract hostname + program[pid] and use program as component

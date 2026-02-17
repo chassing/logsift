@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from logdelve.models import ContentType, LogLine
 
@@ -24,7 +24,7 @@ class TestLogLine:
         line = LogLine(
             line_number=2,
             raw='2024-01-15T10:30:00Z {"key": "value"}',
-            timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            timestamp=datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
             content_type=ContentType.JSON,
             content='{"key": "value"}',
             parsed_json={"key": "value"},

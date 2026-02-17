@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rich.text import Text
 from textual.reactive import reactive
 from textual.widget import Widget
 
-from logdelve.models import FilterRule, LogLevel
+if TYPE_CHECKING:
+    from logdelve.models import FilterRule, LogLevel
+
+_MAX_SEARCH_DISPLAY_LEN = 10
 
 
 class FilterBar(Widget):
@@ -23,7 +28,7 @@ class FilterBar(Widget):
 
     filters: reactive[list[FilterRule]] = reactive(list, always_update=True)
 
-    def __init__(self, id: str | None = None) -> None:
+    def __init__(self, *, id: str | None = None) -> None:  # noqa: A002
         super().__init__(id=id)
         self._min_level: LogLevel | None = None
         self._has_levels: bool = False
@@ -35,13 +40,13 @@ class FilterBar(Widget):
         """Update the displayed filters."""
         self.filters = list(rules)
 
-    def set_level_info(self, min_level: LogLevel | None, has_levels: bool = False) -> None:
+    def set_level_info(self, min_level: LogLevel | None, *, has_levels: bool = False) -> None:
         """Update level filter display."""
         self._min_level = min_level
         self._has_levels = has_levels
         self.refresh()
 
-    def set_anomaly_info(self, count: int, filter_active: bool) -> None:
+    def set_anomaly_info(self, count: int, *, filter_active: bool) -> None:
         """Update anomaly detection display."""
         self._anomaly_count = count
         self._anomaly_filter_active = filter_active
@@ -72,7 +77,11 @@ class FilterBar(Widget):
         text.append("  │", style="dim")
         text.append("  /", style="bold")
         if self._search_text:
-            display = self._search_text[:10] + "…" if len(self._search_text) > 10 else self._search_text
+            display = (
+                self._search_text[:_MAX_SEARCH_DISPLAY_LEN] + "…"
+                if len(self._search_text) > _MAX_SEARCH_DISPLAY_LEN
+                else self._search_text
+            )
             text.append(f" {display}", style="bold cyan")
             text.append("  n", style="bold")
             text.append("/", style="dim")

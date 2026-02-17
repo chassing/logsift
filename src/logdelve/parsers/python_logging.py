@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from typing import override
 
 from logdelve.parsers.base import (
     _LEVEL_MAP,
@@ -38,6 +39,7 @@ class PythonLoggingParser(LogParser):
     def description(self) -> str:
         return "Python logging (YYYY-MM-DD HH:MM:SS,ms - name - LEVEL - msg)"
 
+    @override
     def try_parse(self, raw: str) -> ParseResult | None:
         m = _PYTHON_LOG_RE.match(raw)
         if m is None:

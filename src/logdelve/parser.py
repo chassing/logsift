@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from logdelve.models import LogLine
-from logdelve.parsers.base import LogParser
-from logdelve.parsers.base import classify_content as classify_content
-from logdelve.parsers.base import extract_log_level as extract_log_level
+if TYPE_CHECKING:
+    from logdelve.models import LogLine
+    from logdelve.parsers.base import LogParser
 
 # ---- Timestamp extraction (kept for backward compat) ----
 
@@ -76,6 +75,7 @@ def _try_syslog(raw: str) -> tuple[datetime | None, str]:
         hour=int(m.group("hour")),
         minute=int(m.group("min")),
         second=int(m.group("sec")),
+        tzinfo=UTC,
     )
     return ts, raw[m.end() :]
 
@@ -91,6 +91,7 @@ def _try_apache(raw: str) -> tuple[datetime | None, str]:
         hour=int(m.group("hour")),
         minute=int(m.group("min")),
         second=int(m.group("sec")),
+        tzinfo=UTC,
     )
     return ts, raw[m.end() :]
 
@@ -106,6 +107,7 @@ def _try_slash_date(raw: str) -> tuple[datetime | None, str]:
         hour=int(m.group("hour")),
         minute=int(m.group("min")),
         second=int(m.group("sec")),
+        tzinfo=UTC,
     )
     return ts, raw[m.end() :]
 
@@ -162,9 +164,9 @@ _default_parser = None
 
 def _get_default_parser() -> LogParser:
     """Lazy-load the default AutoParser."""
-    global _default_parser
+    global _default_parser  # noqa: PLW0603
     if _default_parser is None:
-        from logdelve.parsers import ParserName, get_parser
+        from logdelve.parsers import ParserName, get_parser  # noqa: PLC0415
 
         _default_parser = get_parser(ParserName.AUTO)
     return _default_parser

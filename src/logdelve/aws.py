@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import sys
 import time
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from mypy_boto3_logs import CloudWatchLogsClient
     from mypy_boto3_logs.type_defs import FilteredLogEventTypeDef
+
+_MAX_SEEN_IDS = 10_000
+_KEEP_SEEN_IDS = 5_000
 
 
 def create_client(
@@ -23,9 +27,9 @@ def create_client(
 ) -> CloudWatchLogsClient:
     """Create a boto3 CloudWatch Logs client."""
     try:
-        import boto3
+        import boto3  # noqa: PLC0415
     except ImportError:
-        print("Error: boto3 not installed. Run: pip install logdelve[aws]", file=sys.stderr)
+        print("Error: boto3 not installed. Run: pip install logdelve[aws]", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
     session = boto3.Session(
@@ -57,7 +61,7 @@ def _extract_message(raw_message: str, message_key: str | None) -> str:
     if not message_key:
         return raw_message
 
-    import json
+    import json  # noqa: PLC0415
 
     try:
         parsed = json.loads(raw_message)
@@ -138,7 +142,7 @@ def tail_log_events(
                 continue
             seen_ids.add(event_id)
             ts, msg, stream = _format_event(event, message_key)
-            print(f"[{stream}] {ts} {msg}", flush=True)
+            print(f"[{stream}] {ts} {msg}", flush=True)  # noqa: T201
 
         next_token = response.get("nextToken")
         if next_token:
@@ -150,8 +154,8 @@ def tail_log_events(
                 break
 
         # Limit memory for seen IDs
-        if len(seen_ids) > 10000:
-            seen_ids = set(list(seen_ids)[-5000:])
+        if len(seen_ids) > _MAX_SEEN_IDS:
+            seen_ids = set(list(seen_ids)[-_KEEP_SEEN_IDS:])
 
 
 def list_log_groups(client: CloudWatchLogsClient, prefix: str | None = None) -> Iterator[str]:

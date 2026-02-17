@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from logdelve.models import ContentType, LogLine
 from logdelve.templates import MessageTemplate, build_template_groups, extract_template
 
+_MIN_SPIKE_COUNT = 10
 
+
+@dataclass
 class BaselineData:
     """Pre-computed template statistics from a baseline log file."""
 
-    def __init__(self, template_hashes: set[str], template_counts: dict[str, int], total_lines: int) -> None:
-        self.template_hashes = template_hashes
-        self.template_counts = template_counts
-        self.total_lines = total_lines
+    template_hashes: set[str]
+    template_counts: dict[str, int]
+    total_lines: int
 
 
 class AnomalyResult:
@@ -73,7 +77,7 @@ def detect_anomalies(lines: list[LogLine], baseline: BaselineData) -> AnomalyRes
                 # Normalize by total lines to compare rates
                 baseline_rate = baseline_count / baseline.total_lines
                 current_rate = group.count / len(lines) if len(lines) > 0 else 0
-                if current_rate > baseline_rate * 5 and group.count > 10:
+                if current_rate > baseline_rate * 5 and group.count > _MIN_SPIKE_COUNT:
                     result.frequency_spikes.append((group, baseline_count, group.count))
                     for idx in group.line_indices:
                         result.scores[idx] = max(result.scores.get(idx, 0), 0.5)
@@ -87,7 +91,7 @@ def detect_anomalies(lines: list[LogLine], baseline: BaselineData) -> AnomalyRes
 
 def compute_line_templates(lines: list[LogLine]) -> list[str]:
     """Compute the template hash for each line (for per-line anomaly lookup)."""
-    from logdelve.templates import _compute_hash
+    from logdelve.templates import _compute_hash  # noqa: PLC0415
 
     result: list[str] = []
     for line in lines:

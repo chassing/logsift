@@ -79,7 +79,9 @@ class TestExtractTemplate:
         """Same event value should produce same template regardless of other keys."""
         data1 = {"event": "Start", "a": 1}
         data2 = {"event": "Start", "a": 1, "b": 2, "c": 3}
-        assert extract_template("", True, data1) == extract_template("", True, data2)
+        assert extract_template("", is_json=True, parsed_json=data1) == extract_template(
+            "", is_json=True, parsed_json=data2
+        )
 
     def test_json_template_list(self) -> None:
         data = {"items": [1, 2, 3]}

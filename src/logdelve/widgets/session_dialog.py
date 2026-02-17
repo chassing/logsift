@@ -2,25 +2,37 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.text import Text
-from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
+
 from logdelve.session import delete_session, list_sessions, rename_session
 
 
+class SessionActionType(StrEnum):
+    """Possible session dialog actions."""
+
+    LOAD = "load"
+    SAVE = "save"
+
+
+@dataclass
 class SessionAction:
     """Result from the session management dialog."""
 
-    def __init__(self, action: str, name: str) -> None:
-        self.action = action  # "load" or "save"
-        self.name = name
+    action: SessionActionType
+    name: str
 
 
 class SessionManageDialog(ModalScreen[SessionAction | None]):
@@ -71,7 +83,7 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
         self._current_session = current_session
         self._renaming: str | None = None
 
-    def compose(self) -> ComposeResult:
+    def compose(self) -> ComposeResult:  # noqa: PLR6301
         with Vertical():
             yield Label("Session manager", classes="title")
             yield OptionList(id="session-list")
@@ -107,13 +119,13 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
         option = ol.get_option_at_index(ol.highlighted)
         return str(option.id) if option.id and not str(option.id).startswith("(") else None
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+    def on_option_list_option_selected(self, _event: OptionList.OptionSelected) -> None:
         """Load a session when Enter is pressed on the OptionList."""
         if self._renaming:
             return
         name = self._get_selected_name()
         if name:
-            self.dismiss(SessionAction("load", name))
+            self.dismiss(SessionAction(SessionActionType.LOAD, name))
 
     def action_delete_session(self) -> None:
         if self._renaming:
@@ -149,7 +161,7 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
             self._rebuild_list()
             self.query_one("#session-list", OptionList).focus()
         else:
-            self.dismiss(SessionAction("save", new_name))
+            self.dismiss(SessionAction(SessionActionType.SAVE, new_name))
 
     def action_cancel(self) -> None:
         if self._renaming:

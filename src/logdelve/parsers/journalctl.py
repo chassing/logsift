@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, override
 
 from logdelve.models import ContentType, LogLevel
 from logdelve.parsers.base import (
@@ -40,6 +40,7 @@ class JournalctlParser(LogParser):
     def description(self) -> str:
         return "systemd journalctl JSON output (journalctl -o json)"
 
+    @override
     def try_parse(self, raw: str) -> ParseResult | None:
         stripped = raw.strip()
         if not stripped.startswith("{"):
@@ -76,7 +77,7 @@ class JournalctlParser(LogParser):
 
         # If no level from PRIORITY, try common level fields in MESSAGE
         if log_level is None and message:
-            from logdelve.parsers.base import extract_log_level
+            from logdelve.parsers.base import extract_log_level  # noqa: PLC0415
 
             log_level = extract_log_level(message, None)
 

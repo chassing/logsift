@@ -32,7 +32,7 @@ _COMPONENT_COLORS = [
 ]
 
 
-class LogView(ScrollView, can_focus=True):
+class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
     """Scrollable log line viewer using the Line API for virtual rendering."""
 
     DEFAULT_CSS = """
@@ -123,7 +123,7 @@ class LogView(ScrollView, can_focus=True):
 
     cursor_line: reactive[int] = reactive(0)
 
-    def __init__(self, lines: list[LogLine] | None = None, **kwargs: Any) -> None:
+    def __init__(self, lines: list[LogLine] | None = None, **kwargs: Any) -> None:  # noqa: ANN401
         super().__init__(**kwargs)
         self._all_lines: list[LogLine] = lines or []
         self._g_pending: bool = False
@@ -154,9 +154,9 @@ class LogView(ScrollView, can_focus=True):
         self._search_matches_by_line: dict[int, list[tuple[int, int]]] = {}
 
     @property
-    def _lines(self) -> list[LogLine]:
+    def lines(self) -> list[LogLine]:
         """Get the currently visible lines (filtered or all)."""
-        if self._filtered_indices is not None and self.has_filters:
+        if self._filtered_indices and self.has_filters:
             return [self._all_lines[i] for i in self._filtered_indices]
         return self._all_lines
 
@@ -166,7 +166,7 @@ class LogView(ScrollView, can_focus=True):
 
     @property
     def filtered_count(self) -> int:
-        return len(self._lines)
+        return len(self.lines)
 
     @property
     def has_filters(self) -> bool:
@@ -181,6 +181,24 @@ class LogView(ScrollView, can_focus=True):
                 counts[line.log_level] = counts.get(line.log_level, 0) + 1
         return counts
 
+    @property
+    def anomaly_filter(self) -> bool:
+        """Whether the anomaly filter is active."""
+        return self._anomaly_filter
+
+    @anomaly_filter.setter
+    def anomaly_filter(self, value: bool) -> None:
+        self._anomaly_filter = value
+
+    @property
+    def min_level(self) -> LogLevel | None:
+        """Current minimum log level filter."""
+        return self._min_level
+
+    @min_level.setter
+    def min_level(self, value: LogLevel | None) -> None:
+        self._min_level = value
+
     def set_anomaly_scores(self, scores: dict[int, float]) -> None:
         """Set anomaly scores from baseline comparison."""
         self._anomaly_scores = scores
@@ -188,10 +206,10 @@ class LogView(ScrollView, can_focus=True):
 
     def toggle_anomaly_filter(self) -> None:
         """Toggle showing only anomalous lines."""
-        orig_idx = self._cursor_orig_index()
+        orig_idx = self.cursor_orig_index()
         self._anomaly_filter = not self._anomaly_filter
         self._apply_filters()
-        self._restore_cursor(orig_idx)
+        self.restore_cursor(orig_idx)
         self.refresh()
 
     @property
@@ -219,7 +237,7 @@ class LogView(ScrollView, can_focus=True):
         self.clear_search()
         self._apply_filters()
 
-    def _cursor_orig_index(self) -> int | None:
+    def cursor_orig_index(self) -> int | None:
         """Get the original line index (in _all_lines) of the current cursor."""
         if not self._filtered_indices:
             return None
@@ -228,10 +246,10 @@ class LogView(ScrollView, can_focus=True):
             return None
         return self._filtered_indices[cursor]
 
-    def _restore_cursor(self, orig_idx: int | None) -> None:
+    def restore_cursor(self, orig_idx: int | None) -> None:
         """Restore cursor to the nearest visible line matching the original index and scroll to it."""
         if orig_idx is None or not self._filtered_indices:
-            visible = self._lines
+            visible = self.lines
             self.cursor_line = max(0, len(visible) - 1) if visible else 0
         else:
             # Find the closest visible line >= orig_idx
@@ -246,10 +264,10 @@ class LogView(ScrollView, can_focus=True):
 
     def set_filters(self, rules: list[FilterRule]) -> None:
         """Apply filter rules and refresh display."""
-        orig_idx = self._cursor_orig_index()
+        orig_idx = self.cursor_orig_index()
         self._filter_rules = list(rules)
         self._apply_filters()
-        self._restore_cursor(orig_idx)
+        self.restore_cursor(orig_idx)
         # Re-run search on filtered lines
         if self._search_query:
             self._compute_search_matches()
@@ -257,7 +275,7 @@ class LogView(ScrollView, can_focus=True):
 
     def append_line(self, line: LogLine) -> None:
         """Append a single line (for tailing). Auto-scrolls only if cursor was on last line."""
-        visible_before = len(self._lines)
+        visible_before = len(self.lines)
         cursor_was_on_last = self.cursor_line >= visible_before - 1
 
         idx = len(self._all_lines)
@@ -273,9 +291,9 @@ class LogView(ScrollView, can_focus=True):
             self._filtered_indices.append(idx)
 
         # Update heights for the new visible line
-        visible_idx = len(self._lines) - 1
+        visible_idx = len(self.lines) - 1
         expanded = self._is_expanded(visible_idx)
-        h = get_line_height(line, expanded)
+        h = get_line_height(line, expanded=expanded)
         self._heights.append(h)
         offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
         self._offsets.append(offset)
@@ -285,7 +303,7 @@ class LogView(ScrollView, can_focus=True):
         self.virtual_size = Size(self._max_width + 10, total_height)
 
         if cursor_was_on_last:
-            self.cursor_line = len(self._lines) - 1
+            self.cursor_line = len(self.lines) - 1
             self._scroll_cursor_into_view()
 
         self.refresh()
@@ -300,10 +318,10 @@ class LogView(ScrollView, can_focus=True):
 
     def set_min_level(self, level: LogLevel | None) -> None:
         """Set minimum log level filter and refresh display."""
-        orig_idx = self._cursor_orig_index()
+        orig_idx = self.cursor_orig_index()
         self._min_level = level
         self._apply_filters()
-        self._restore_cursor(orig_idx)
+        self.restore_cursor(orig_idx)
         if self._search_query:
             self._compute_search_matches()
         self.refresh()
@@ -336,13 +354,13 @@ class LogView(ScrollView, can_focus=True):
 
     def _recompute_heights(self) -> None:
         """Recompute line heights and prefix-sum offsets."""
-        visible = self._lines
+        visible = self.lines
         self._heights = []
         self._offsets = []
         offset = 0
         for i, line in enumerate(visible):
             expanded = self._is_expanded(i)
-            h = get_line_height(line, expanded)
+            h = get_line_height(line, expanded=expanded)
             self._heights.append(h)
             self._offsets.append(offset)
             offset += h
@@ -358,13 +376,13 @@ class LogView(ScrollView, can_focus=True):
         if not self._offsets:
             return 0, 0
         idx = bisect.bisect_right(self._offsets, display_row) - 1
-        idx = max(0, min(idx, len(self._lines) - 1))
+        idx = max(0, min(idx, len(self.lines) - 1))
         sub_row = display_row - self._offsets[idx]
         return idx, sub_row
 
     @property
     def line_count(self) -> int:
-        return len(self._lines)
+        return len(self.lines)
 
     # --- Search ---
 
@@ -392,7 +410,7 @@ class LogView(ScrollView, can_focus=True):
             self._search_current = -1
             self._search_matches_by_line = {}
             return
-        visible = self._lines
+        visible = self.lines
         self._search_matches = find_matches(visible, self._search_query)
         self._search_current = -1
         # Group by line index for efficient rendering
@@ -439,12 +457,12 @@ class LogView(ScrollView, can_focus=True):
         self.cursor_line = self._search_matches[self._search_current][0]
         # Update search status in app
         try:
-            from logdelve.app import LogDelveApp
+            from logdelve.app import LogDelveApp  # noqa: PLC0415
 
             app = self.app
             if isinstance(app, LogDelveApp):
-                app._update_search_status()
-        except Exception:
+                app.update_search_status()
+        except ImportError:
             pass
 
     def action_prev_match(self) -> None:
@@ -459,17 +477,17 @@ class LogView(ScrollView, can_focus=True):
         self.cursor_line = self._search_matches[self._search_current][0]
         # Update search status in app
         try:
-            from logdelve.app import LogDelveApp
+            from logdelve.app import LogDelveApp  # noqa: PLC0415
 
             app = self.app
             if isinstance(app, LogDelveApp):
-                app._update_search_status()
-        except Exception:
+                app.update_search_status()
+        except ImportError:
             pass
 
     # --- Rendering ---
 
-    def render_line(self, y: int) -> Strip:
+    def render_line(self, y: int) -> Strip:  # noqa: PLR0914
         scroll_x, scroll_y = self.scroll_offset
         display_row = scroll_y + y
         content_width = self.scrollable_content_region.width
@@ -482,7 +500,7 @@ class LogView(ScrollView, can_focus=True):
             return Strip.blank(content_width, self.rich_style)
 
         line_index, sub_row = self._display_row_to_line(display_row)
-        visible = self._lines
+        visible = self.lines
         line = visible[line_index]
         is_highlighted = line_index == self.cursor_line
         expanded = self._is_expanded(line_index)
@@ -517,7 +535,7 @@ class LogView(ScrollView, can_focus=True):
 
         if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
             strips = render_json_expanded(
-                line, content_width, lineno_style, timestamp_style, bg_style, self._show_line_numbers
+                line, content_width, lineno_style, timestamp_style, bg_style, show_line_numbers=self._show_line_numbers
             )
             strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
         elif expanded and line.content_type == ContentType.TEXT and sub_row == 1:
@@ -557,7 +575,7 @@ class LogView(ScrollView, can_focus=True):
 
         return strip
 
-    def _render_compact_line(
+    def _render_compact_line(  # noqa: C901, PLR0912
         self,
         line: LogLine,
         lineno_style: Style,
@@ -569,6 +587,7 @@ class LogView(ScrollView, can_focus=True):
         search_match_style: Style | None = None,
         current_match: tuple[int, int] | None = None,
         search_current_style: Style | None = None,
+        *,
         is_anomaly: bool = False,
     ) -> list[Segment]:
         """Render a single compact log line with optional search highlighting."""
@@ -682,9 +701,9 @@ class LogView(ScrollView, can_focus=True):
         self._scroll_cursor_into_view()
         self.refresh()
 
-    def _scroll_cursor_into_view(self, center: bool = False) -> None:
+    def _scroll_cursor_into_view(self, *, center: bool = False) -> None:
         """Ensure the cursor line is visible, optionally centering it."""
-        visible = self._lines
+        visible = self.lines
         if not visible or not self._offsets:
             return
         region_height = self.scrollable_content_region.height
@@ -716,7 +735,7 @@ class LogView(ScrollView, can_focus=True):
             self.cursor_line -= 1
 
     def action_cursor_down(self) -> None:
-        if self.cursor_line < len(self._lines) - 1:
+        if self.cursor_line < len(self.lines) - 1:
             self.cursor_line += 1
 
     def action_page_up(self) -> None:
@@ -733,14 +752,14 @@ class LogView(ScrollView, can_focus=True):
             return
         target_row = self._offsets[self.cursor_line] + page_size
         target_line, _ = self._display_row_to_line(target_row)
-        self.cursor_line = min(target_line, len(self._lines) - 1)
+        self.cursor_line = min(target_line, len(self.lines) - 1)
 
     def action_scroll_home(self) -> None:
         self.cursor_line = 0
 
     def action_scroll_end(self) -> None:
-        if self._lines:
-            self.cursor_line = len(self._lines) - 1
+        if self.lines:
+            self.cursor_line = len(self.lines) - 1
 
     def action_toggle_json_global(self) -> None:
         """Toggle expand for all lines (JSON pretty-print / full raw text)."""

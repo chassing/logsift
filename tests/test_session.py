@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from logdelve.models import FilterRule, FilterType
 from logdelve.session import create_session, delete_session, list_sessions, load_session, save_session
 
@@ -61,12 +63,8 @@ class TestSession:
             assert list_sessions() == []
 
     def test_load_nonexistent_session(self, tmp_path: object) -> None:
-        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):
-            try:
-                load_session("nonexistent")
-                assert False, "Should have raised FileNotFoundError"  # noqa: B011
-            except FileNotFoundError:
-                pass
+        with patch("logdelve.session.get_sessions_dir", return_value=tmp_path), pytest.raises(FileNotFoundError):
+            load_session("nonexistent")
 
     def test_delete_session(self, tmp_path: object) -> None:
         with patch("logdelve.session.get_sessions_dir", return_value=tmp_path):

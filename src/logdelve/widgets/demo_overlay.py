@@ -60,5 +60,5 @@ def setup_demo(app: App[None]) -> None:
         index[0] = (index[0] + 1) % len(labels)
         app.notify(labels[index[0]], timeout=4)
 
-    app._demo_next_label = next_label  # type: ignore[attr-defined]
+    app._demo_next_label = next_label  # type: ignore[attr-defined]  # noqa: SLF001
     app.screen.add_class("demo-mode")

@@ -6,6 +6,8 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from logdelve.aws import (
     _extract_message,
     _format_event,
@@ -73,11 +75,8 @@ class TestParseTime:
         assert result.day == 15
 
     def test_unknown_string_raises(self) -> None:
-        try:
+        with pytest.raises(ValueError, match="Cannot parse time"):
             parse_time("not a date at all xyz123")
-            assert False, "Should raise ValueError"  # noqa: B011
-        except ValueError:
-            pass
 
 
 class TestTimestampConversion:

@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, override
 
 from rich.text import Text
-from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
 
 from logdelve.models import FilterRule, FilterType, LogLevel, LogLine
 from logdelve.templates import (
@@ -81,6 +84,7 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
         self._sort = "count"  # count | level (messages) or count | key (fields)
         self._reverse = False  # False = default order, True = reversed
 
+    @override
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label("", id="groups-title", classes="title")
@@ -140,7 +144,8 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
             groups.sort(key=lambda g: (g.key, g.count), reverse=self._reverse)
         return groups
 
-    def _format_template_group(self, group: MessageTemplate) -> Text:
+    @staticmethod
+    def _format_template_group(group: MessageTemplate) -> Text:
         text = Text()
 
         if group.log_level is not None:
@@ -171,7 +176,8 @@ class GroupsDialog(ModalScreen[FilterRule | None]):
 
         return text
 
-    def _format_field_group(self, fg: FieldGroup) -> Text:
+    @staticmethod
+    def _format_field_group(fg: FieldGroup) -> Text:
         text = Text()
         text.append(f"  {fg.count:>6}x  ", style="bold")
         text.append(fg.key, style="green")

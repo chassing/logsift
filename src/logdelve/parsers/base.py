@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from logdelve.models import ContentType, LogLevel, LogLine
 
@@ -46,26 +49,16 @@ _LEVEL_KV_RE = re.compile(r"(?:level|severity)=(?P<level>\w+)", re.IGNORECASE)
 _COMPONENT_JSON_KEYS = ("service", "component", "app", "source", "container", "pod")
 
 
+@dataclass(slots=True)
 class ParseResult:
     """Intermediate result from a parser's parse attempt."""
 
-    __slots__ = ("component", "content", "content_type", "log_level", "parsed_json", "timestamp")
-
-    def __init__(
-        self,
-        timestamp: datetime | None,
-        content: str,
-        content_type: ContentType,
-        parsed_json: dict[str, Any] | None = None,
-        log_level: LogLevel | None = None,
-        component: str | None = None,
-    ) -> None:
-        self.timestamp = timestamp
-        self.content = content
-        self.content_type = content_type
-        self.parsed_json = parsed_json
-        self.log_level = log_level
-        self.component = component
+    timestamp: datetime | None
+    content: str
+    content_type: ContentType
+    parsed_json: dict[str, Any] | None = None
+    log_level: LogLevel | None = None
+    component: str | None = None
 
 
 class LogParser(ABC):

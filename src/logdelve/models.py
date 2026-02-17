@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime  # noqa: TC003 - Pydantic needs this at runtime for model field resolution
 from enum import StrEnum
 from typing import Any
 

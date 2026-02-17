@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, override
 
-from textual.app import ComposeResult
-from textual.binding import BindingType
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
 
 HELP_TEXT = """\
 [bold]Navigation[/bold]
@@ -88,6 +90,7 @@ class HelpScreen(ModalScreen[None]):
         ("q", "dismiss_help", "Close"),
     ]
 
+    @override
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             yield Static(HELP_TEXT, markup=True)

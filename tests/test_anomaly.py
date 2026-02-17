@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from logdelve.anomaly import build_baseline, detect_anomalies
 from logdelve.models import ContentType, LogLine
 
@@ -81,7 +83,7 @@ class TestDetectAnomalies:
         ]
         baseline = build_baseline(baseline_lines)
         result = detect_anomalies(current_lines, baseline)
-        assert result.scores.get(1, 0) == 1.0  # Line index 1 is novel
+        assert result.scores.get(1, 0) == pytest.approx(1.0)  # Line index 1 is novel
         assert 0 not in result.scores  # Line index 0 is known
 
     def test_disappeared_templates(self) -> None:
@@ -139,4 +141,4 @@ class TestDetectAnomalies:
         baseline = build_baseline(baseline_lines)
         result = detect_anomalies(current_lines, baseline)
         assert result.anomaly_count >= 1
-        assert result.scores.get(1, 0) == 1.0
+        assert result.scores.get(1, 0) == pytest.approx(1.0)

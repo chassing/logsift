@@ -20,7 +20,7 @@ class StatusBar(Widget):
     }
     """
 
-    def __init__(self, source: str = "", id: str | None = None) -> None:
+    def __init__(self, source: str = "", id: str | None = None) -> None:  # noqa: A002
         super().__init__(id=id)
         self._total: int = 0
         self._filtered: int | None = None
@@ -39,7 +39,7 @@ class StatusBar(Widget):
         self._filtered = filtered
         self.refresh()
 
-    def set_tailing(self, tailing: bool) -> None:
+    def set_tailing(self, *, tailing: bool) -> None:
         """Set tailing mode indicator."""
         self._tailing = tailing
         self.refresh()
@@ -72,7 +72,7 @@ class StatusBar(Widget):
         self._search_total = None
         self.refresh()
 
-    def render(self) -> Text:
+    def render(self) -> Text:  # noqa: C901, PLR0912
         text = Text()
 
         if self._tailing:

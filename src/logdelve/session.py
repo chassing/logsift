@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import tomllib
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import tomli_w
 
 from logdelve.config import get_sessions_dir
 from logdelve.models import FilterRule, Session
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def save_session(session: Session) -> Path:

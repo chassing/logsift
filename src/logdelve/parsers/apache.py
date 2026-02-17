@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import override
 
 from logdelve.parsers.base import (
     LogParser,
@@ -45,6 +46,7 @@ class ApacheParser(LogParser):
     def description(self) -> str:
         return "Apache/Nginx CLF ([DD/Mon/YYYY:HH:MM:SS +0000])"
 
+    @override
     def try_parse(self, raw: str) -> ParseResult | None:
         m = _APACHE_RE.match(raw)
         if m is None:
@@ -56,6 +58,7 @@ class ApacheParser(LogParser):
             hour=int(m.group("hour")),
             minute=int(m.group("min")),
             second=int(m.group("sec")),
+            tzinfo=UTC,
         )
         content = raw[m.end() :]
         content_type, parsed_json = classify_content(content)

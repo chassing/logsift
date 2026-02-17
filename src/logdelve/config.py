@@ -32,7 +32,7 @@ def load_config() -> AppConfig:
     try:
         data: dict[str, Any] = tomllib.loads(path.read_text())
         return AppConfig(**data)
-    except Exception:
+    except (OSError, ValueError, TypeError, KeyError):
         return AppConfig()
 
 

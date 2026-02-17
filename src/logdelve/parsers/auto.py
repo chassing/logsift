@@ -1,5 +1,6 @@
 """Auto parser - tries all format-specific parsers per line."""
 
+# ruff: noqa: PLC0415
 from __future__ import annotations
 
 from logdelve.parsers.base import LogParser, ParseResult

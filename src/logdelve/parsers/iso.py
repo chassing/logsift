@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import override
 
 from logdelve.parsers.base import (
     LogParser,
@@ -33,6 +34,7 @@ class IsoParser(LogParser):
     def description(self) -> str:
         return "ISO 8601 and slash-date timestamps (generic)"
 
+    @override
     def try_parse(self, raw: str) -> ParseResult | None:
         ts, content = _try_iso(raw)
         if ts is None:
@@ -76,5 +78,6 @@ def _try_slash_date(raw: str) -> tuple[datetime | None, str]:
         hour=int(m.group("hour")),
         minute=int(m.group("min")),
         second=int(m.group("sec")),
+        tzinfo=UTC,
     )
     return ts, raw[m.end() :]

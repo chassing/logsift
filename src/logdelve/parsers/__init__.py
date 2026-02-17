@@ -1,11 +1,15 @@
 """Parser registry, auto-detection, and the ParserName enum."""
 
+# ruff: noqa: PLC0415
 from __future__ import annotations
 
-from collections.abc import Sequence
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
-from logdelve.parsers.base import LogParser
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from logdelve.parsers.base import LogParser
 
 
 class ParserName(StrEnum):
@@ -51,7 +55,7 @@ _registry: dict[ParserName, type[LogParser]] | None = None
 
 
 def _get_registry() -> dict[ParserName, type[LogParser]]:
-    global _registry
+    global _registry  # noqa: PLW0603
     if _registry is None:
         _registry = _build_registry()
     return _registry
