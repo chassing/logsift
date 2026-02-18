@@ -10,6 +10,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [UI Layout](#ui-layout)
 - [Log Level Detection](#log-level-detection)
 - [Component Detection](#component-detection)
+- [Multiple Files](#multiple-files)
 - [Supported Log Formats](#supported-log-formats)
 - [Navigation & Display](#navigation--display)
 - [Search](#search)
@@ -248,6 +249,36 @@ logdelve cloudwatch get /log/group prefix | logdelve inspect
 # Each line: [stream-name] 2024-01-15T10:30:00Z {"event": "..."}
 # → component = stream-name, timestamp parsed correctly
 ```
+
+---
+
+## Multiple Files
+
+logdelve accepts multiple log files as positional arguments and merges them chronologically:
+
+```bash
+logdelve inspect api.log worker.log scheduler.log
+```
+
+### How it works
+
+1. Each file is read independently with its own auto-detected parser
+2. Lines without a parser-detected component get the filename (stem) as component
+3. All lines are merged by timestamp (stable sort)
+4. Line numbers show `X:Y` — merged position and original file position
+
+### Component tagging
+
+Each file's lines are tagged with the filename as component (e.g., `api`, `worker`). If the parser already detected a component (e.g., Kubernetes pod name), it is kept as-is. Use `c` to cycle component display and see which file each line came from.
+
+### Chunked loading
+
+For large files, the initial 10,000 lines per file are loaded instantly. Remaining lines are loaded in the background. When loading completes, all lines are re-sorted and renumbered.
+
+### Limitations
+
+- `--tail` is only supported with a single file
+- `--parser` applies to all files when explicitly set; with `auto` (default) each file is detected independently
 
 ---
 

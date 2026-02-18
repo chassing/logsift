@@ -38,6 +38,7 @@ class LogLine(BaseModel):
     parsed_json: dict[str, Any] | None = None
     log_level: LogLevel | None = None
     component: str | None = None
+    source_line_number: int | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

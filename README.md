@@ -23,6 +23,7 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 ## Features
 
 - **[Log level detection](docs/guide.md#log-level-detection)**: Automatic extraction from JSON fields and text patterns, color-coded line backgrounds
+- **[Multiple file input](docs/guide.md#multiple-files)**: Merge multiple log files chronologically with per-file component tagging
 - **[Component detection](docs/guide.md#component-detection)**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
 - **[Anomaly detection](docs/guide.md#anomaly-detection)**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
 - **[Message analysis](docs/guide.md#message-analysis)**: Group log messages by event pattern, analyze JSON field value distributions
@@ -61,6 +62,9 @@ pip install logdelve
 ```bash
 # View a log file
 logdelve inspect app.log
+
+# Merge multiple log files chronologically
+logdelve inspect api.log worker.log scheduler.log
 
 # Pipe logs from kubectl
 kubectl logs deploy/my-app --since=1h | logdelve inspect

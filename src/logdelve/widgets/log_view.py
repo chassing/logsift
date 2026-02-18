@@ -653,7 +653,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             segments.append(Segment(" ", bg_style))
 
         if self._show_line_numbers:
-            lineno_text = f"{line.line_number:>6} "
+            if line.source_line_number is not None:
+                lineno_text = f"{line.line_number}:{line.source_line_number} "
+                lineno_text = f"{lineno_text:>12}"
+            else:
+                lineno_text = f"{line.line_number:>6} "
             segments.append(Segment(lineno_text, lineno_style + bg_style))
 
         # Level badge (single char, row is already colored by level bg)

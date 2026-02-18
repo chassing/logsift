@@ -42,9 +42,10 @@ def render_json_expanded(
         ]
 
     # Compute prefix width for continuation line alignment
+    has_source_lineno = line.source_line_number is not None
     prefix_width = 0
     if show_line_numbers:
-        prefix_width += 7
+        prefix_width += 12 if has_source_lineno else 7
     if line.timestamp is not None:
         ts_end = len(line.raw) - len(line.content)
         prefix_width += ts_end
@@ -57,7 +58,11 @@ def render_json_expanded(
 
         if i == 0:
             if show_line_numbers:
-                lineno_text = f"{line.line_number:>6} "
+                if has_source_lineno:
+                    lineno_text = f"{line.line_number}:{line.source_line_number} "
+                    lineno_text = f"{lineno_text:>12}"
+                else:
+                    lineno_text = f"{line.line_number:>6} "
                 segments.append(Segment(lineno_text, lineno_style + bg_style))
             if line.timestamp is not None:
                 ts_end = len(line.raw) - len(line.content)
@@ -112,7 +117,11 @@ def _render_compact_strip(
     """Render a single compact line as a Strip."""
     segments: list[Segment] = []
     if show_line_numbers:
-        lineno_text = f"{line.line_number:>6} "
+        if line.source_line_number is not None:
+            lineno_text = f"{line.line_number}:{line.source_line_number} "
+            lineno_text = f"{lineno_text:>12}"
+        else:
+            lineno_text = f"{line.line_number:>6} "
         segments.append(Segment(lineno_text, lineno_style + bg_style))
     if line.timestamp is not None:
         ts_end = len(line.raw) - len(line.content)

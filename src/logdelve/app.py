@@ -81,6 +81,9 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         baseline_path: Path | None = None,
         parser: LogParser | None = None,
         file_size: int | None = None,
+        file_paths: list[Path] | None = None,
+        file_parsers: list[LogParser] | None = None,
+        file_initial_counts: list[int] | None = None,
     ) -> None:
         super().__init__()
         self._lines = lines or []
@@ -104,7 +107,10 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._config = load_config()
         self.theme = self._config.theme
         self._file_size = file_size
-        self._loading_complete: bool = file_size is None
+        self._loading_complete: bool = file_size is None and file_paths is None
+        self._file_paths = file_paths
+        self._file_parsers = file_parsers
+        self._file_initial_counts = file_initial_counts
 
     @property
     def _is_streaming(self) -> bool:
@@ -149,8 +155,12 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         elif self._pipe_fd is not None:
             status_bar.set_tailing(tailing=True)
             self.run_worker(self._tail_worker(read_pipe_async(self._pipe_fd, parser=self._parser)), exclusive=True)
+        elif self._file_paths and not self._loading_complete:
+            # Multi-file chunked loading
+            status_bar.set_loading_progress(len(self._lines))
+            self.run_worker(self._multi_file_loading_worker(), exclusive=True)
         elif self._file_path and not self._loading_complete:
-            # Chunked loading: start background worker for remaining lines
+            # Single-file chunked loading
             initial_count = len(self._lines)
             estimated_total = self._estimate_total_lines(initial_count) if initial_count > 0 else None
             status_bar.set_loading_progress(initial_count, estimated_total)
@@ -187,6 +197,47 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             status_bar.set_loading_progress(loaded, estimated_total)
             self._update_status_bar()
         # Loading complete
+        self._loading_complete = True
+        status_bar.clear_loading_progress()
+        self._update_status_bar()
+        if self._baseline_path:
+            self._run_baseline_detection()
+
+    async def _multi_file_loading_worker(self) -> None:
+        """Load remaining lines from multiple files, then sort and replace."""
+        if not self._file_paths or not self._file_parsers or not self._file_initial_counts:
+            return
+        log_view = self.query_one("#log-view", LogView)
+        status_bar = self.query_one("#status-bar", StatusBar)
+        worker = get_current_worker()
+        loaded = log_view.total_count
+
+        # Read remaining lines from each file
+        for file_path, file_parser, initial_count in zip(
+            self._file_paths, self._file_parsers, self._file_initial_counts, strict=True
+        ):
+            async for chunk in read_file_remaining_async(file_path, skip=initial_count, parser=file_parser):
+                if worker.is_cancelled:
+                    return
+                # Tag component for lines without one
+                stem = file_path.stem
+                for line in chunk:
+                    if line.component is None:
+                        line.component = stem
+                log_view.append_lines(chunk)
+                loaded += len(chunk)
+                status_bar.set_loading_progress(loaded)
+                self._update_status_bar()
+
+        # Final sort and renumber
+        ts_min = datetime.min.replace(tzinfo=UTC)
+        all_lines = log_view._all_lines  # noqa: SLF001
+        all_lines.sort(key=lambda line: line.timestamp or ts_min)
+        for i, line in enumerate(all_lines):
+            line.source_line_number = line.source_line_number or line.line_number
+            line.line_number = i + 1
+
+        log_view.set_lines(all_lines)
         self._loading_complete = True
         status_bar.clear_loading_progress()
         self._update_status_bar()
