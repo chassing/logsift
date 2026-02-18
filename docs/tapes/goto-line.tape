@@ -1,5 +1,5 @@
-# Search feature demo
-Output docs/screenshots/search.gif
+# Go to line feature demo
+Output docs/screenshots/goto-line.gif
 
 Require logdelve
 
@@ -18,35 +18,22 @@ Type "clear"
 Enter
 Show
 
-Type "uv run logdelve inspect --no-tail /tmp/demo.log"
+Type "uv run logdelve inspect /tmp/demo.log"
 Enter
 Sleep 2s
 
-# Forward search
-Type "/"
+# Go to line
+Type ":"
 Sleep 0.5s
-Type "error"
+Type "500"
 Enter
 Sleep 1.5s
 
-# Navigate matches
-Type "n"
+# Go to another line
+Type ":"
 Sleep 0.5s
-Type "n"
-Sleep 0.5s
-Type "n"
-Sleep 1s
-
-# Backward search
-Type "?"
-Sleep 0.5s
-# Shows previous search pre-filled
+Type "1000"
 Enter
-Sleep 1s
-
-Type "N"
-Sleep 0.5s
-Type "N"
 Sleep 1.5s
 
 Type "q"

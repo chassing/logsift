@@ -24,15 +24,23 @@ _TIME_UNITS: dict[str, str] = {
 }
 
 
-def parse_time(value: str) -> datetime:
+_TIME_ONLY_RE = re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$")
+
+
+def parse_time(value: str, reference_date: datetime | None = None) -> datetime:
     """Parse time value.
 
     Supports:
     - Relative shorthand: 5m, 1h, 2d, 30s, 1week
     - Natural language: "last friday", "2 days ago", "yesterday 7:58"
-    - Time only: 7:55, 14:30:00 (today in UTC)
+    - Time only: 7:55, 14:30:00 (uses reference_date if provided, otherwise today)
     - ISO 8601: 2024-01-15T10:30:00Z
     - Flexible dates: "2026-02-13 7:58", "Feb 13 2026"
+
+    Args:
+        value: Time string to parse.
+        reference_date: Date to use for time-only input (e.g., "14:30").
+            If None, uses today. Useful when navigating log files from a specific date.
     """
     stripped = value.strip()
 
@@ -43,17 +51,26 @@ def parse_time(value: str) -> datetime:
         unit = match.group(2)
         if unit in _TIME_UNITS:
             delta = timedelta(**{_TIME_UNITS[unit]: amount})
-            return datetime.now(tz=UTC) - delta
+            ref = reference_date or datetime.now(tz=UTC)
+            return ref - delta
+
+    # Time-only input with reference date
+    if reference_date is not None and _TIME_ONLY_RE.match(stripped):
+        parts = stripped.split(":")
+        hour, minute = int(parts[0]), int(parts[1])
+        second = int(parts[2]) if len(parts) >= 3 else 0  # noqa: PLR2004
+        return reference_date.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
     # dateparser handles everything else: ISO, natural language, relative, etc.
-    result = dateparser.parse(
-        stripped,
-        settings={
-            "TIMEZONE": "UTC",
-            "RETURN_AS_TIMEZONE_AWARE": True,
-            "PREFER_DATES_FROM": "past",
-        },
-    )
+    settings: dict[str, object] = {
+        "TIMEZONE": "UTC",
+        "RETURN_AS_TIMEZONE_AWARE": True,
+        "PREFER_DATES_FROM": "past",
+    }
+    if reference_date is not None:
+        settings["RELATIVE_BASE"] = reference_date.replace(tzinfo=None)
+
+    result = dateparser.parse(stripped, settings=settings)
     if result is not None:
         return result
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import bisect
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from rich.color import Color
 from rich.segment import Segment
@@ -13,6 +13,9 @@ from textual.geometry import Size
 from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from logdelve.filters import apply_filters, check_line
 from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchQuery
@@ -876,3 +879,29 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
     def _clear_g_pending(self) -> None:
         self._g_pending = False
+
+    def jump_to_line(self, line_number: int) -> None:
+        """Jump to a specific line number within visible lines."""
+        visible = self.lines
+        for i, line in enumerate(visible):
+            if line.line_number >= line_number:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return
+        # Line number beyond last visible line → go to last
+        if visible:
+            self.cursor_line = len(visible) - 1
+            self._scroll_cursor_center()
+
+    def jump_to_timestamp(self, target: datetime) -> None:
+        """Jump to the first visible line with timestamp >= target."""
+        visible = self.lines
+        for i, line in enumerate(visible):
+            if line.timestamp is not None and line.timestamp >= target:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return
+        # No matching line found → go to last
+        if visible:
+            self.cursor_line = len(visible) - 1
+            self._scroll_cursor_center()

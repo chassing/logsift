@@ -169,6 +169,7 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 | `m`       | Manage filters           |     | `a`       | Analyze messages          |
 | `1`-`9`   | Toggle individual filter |     | `s`       | Session manager           |
 | `p`       | Pause / resume tailing   |     | `h`       | Help screen               |
+| `:`       | Go to line number        |     | `@`       | Jump to timestamp         |
 
 📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
 

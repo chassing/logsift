@@ -14,7 +14,8 @@ Set TypingSpeed 80ms
 Hide
 Type "uv run python scripts/gen_demo_logs.py current > /tmp/demo.log"
 Enter
-Sleep 1s
+Type "clear"
+Enter
 Show
 
 Type "uv run logdelve inspect --no-tail /tmp/demo.log"

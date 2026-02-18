@@ -19,6 +19,8 @@ HELP_TEXT = """\
   Home/End                              Jump to first/last line
   gg                                    Jump to first line
   G                                     Jump to last line
+  :                                     Go to line number
+  @                                     Jump to timestamp
 
 [bold]Search[/bold]
   /                                     Search forward
@@ -26,7 +28,8 @@ HELP_TEXT = """\
   n                                     Next match
   N                                     Previous match
 
-  Search dialog has case-sensitive and regex options.
+  Search dialog has tabs: Search, Line, Time.
+  /, ?, :, @ each open the respective tab.
 
 [bold]Display[/bold]
   j                                     Toggle pretty-print for ALL JSON lines

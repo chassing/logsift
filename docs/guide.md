@@ -12,8 +12,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [Component Detection](#component-detection)
 - [Multiple Files](#multiple-files)
 - [Supported Log Formats](#supported-log-formats)
-- [Navigation & Display](#navigation--display)
-- [Search](#search)
+- [Navigation, Search & Display](#navigation-search--display)
 - [Filtering](#filtering)
 - [Filter Management](#filter-management)
 - [Message Analysis](#message-analysis)
@@ -325,25 +324,16 @@ Lines without a recognized timestamp are displayed as-is. No level badge, no tim
 
 ---
 
-## Navigation & Display
+## Navigation, Search & Display
 
-### Navigation keys
-
-| Key         | Action                               |
-| ----------- | ------------------------------------ |
-| Up / Down   | Move between log lines               |
-| PgUp / PgDn | Page up / down                       |
-| Home / End  | Jump to first / last line            |
-| `gg`        | Jump to first line (press `g` twice) |
-| `G`         | Jump to last line                    |
-
-### JSON display
+### Display
 
 | Key   | Action                                                 |
 | ----- | ------------------------------------------------------ |
 | `j`   | Toggle pretty-print for ALL JSON lines (global)        |
 | Enter | Toggle pretty-print for the current line only (sticky) |
 | `#`   | Toggle line number display                             |
+| `c`   | Cycle component display (tag / full / off)             |
 
 When a JSON line is expanded, it shows syntax-highlighted, indented JSON:
 
@@ -356,25 +346,27 @@ When a JSON line is expanded, it shows syntax-highlighted, indented JSON:
 }
 ```
 
----
+### Movement
 
-## Search
+| Key         | Action                               |
+| ----------- | ------------------------------------ |
+| Up / Down   | Move between log lines               |
+| PgUp / PgDn | Page up / down                       |
+| Home / End  | Jump to first / last line            |
+| `gg`        | Jump to first line (press `g` twice) |
+| `G`         | Jump to last line                    |
+| `:`         | Go to line number                    |
+| `@`         | Jump to timestamp                    |
+
+### Search
 
 ![Search demo](screenshots/search.gif)
 
 Press `/` for forward search, `?` for backward search.
 
-### Search dialog
-
-The search dialog offers:
-
 - **Pattern input**: text or regex pattern
-- **Case sensitive**: toggle with Space
-- **Regex**: toggle with Space
-
-Press Enter to search, Escape to cancel.
-
-### Search navigation
+- **Case sensitive** / **Regex**: toggle with Space
+- Press Enter to search, Escape to cancel
 
 | Key | Action                              |
 | --- | ----------------------------------- |
@@ -383,11 +375,32 @@ Press Enter to search, Escape to cancel.
 
 Matches are highlighted in the log view. The current match has a brighter highlight. The status bar shows `[3/42]` — current match position and total count.
 
-### Search persistence
+When you press `/` or `?` again, the dialog is pre-filled with your last search. The toolbar shows the active search text.
 
-When you press `/` or `?` again, the dialog is pre-filled with your last search (pattern, case-sensitive, and regex settings).
+### Go to Line
 
-The toolbar shows the active search text: `/ connection…` in cyan, with `n/N next/prev` shortcut hints.
+![Go to line demo](screenshots/goto-line.gif)
+
+Press `:` to open the Line tab. Enter a line number and press Enter — the cursor jumps to that line, centered on screen.
+
+### Jump to Timestamp
+
+![Jump to timestamp demo](screenshots/jump-to-time.gif)
+
+Press `@` to open the Time tab. Enter a timestamp and press Enter — the cursor jumps to the first line at or after that time.
+
+Supported formats:
+
+| Format           | Example                                  |
+| ---------------- | ---------------------------------------- |
+| Time only        | `14:30`, `08:45:00`                      |
+| ISO 8601         | `2024-03-15T14:30:00Z`                   |
+| Relative         | `5m`, `1h`, `2d` (before last log entry) |
+| Natural language | `yesterday 8am`, `friday`                |
+
+When a time-only value like `14:30` is entered, the date is inferred from the log file's timestamps (not from today's date).
+
+The navigation dialog (`/`, `?`, `:`, `@`) is a tabbed interface — you can switch between Search, Line, and Time tabs with Tab/Shift-Tab.
 
 ---
 
@@ -829,6 +842,8 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 | Home / End  | First / last line  |
 | `gg`        | First line         |
 | `G`         | Last line          |
+| `:`         | Go to line number  |
+| `@`         | Jump to timestamp  |
 
 ### Display
 

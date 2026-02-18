@@ -22,7 +22,7 @@ from logdelve.widgets.filter_manage_dialog import FilterManageDialog
 from logdelve.widgets.groups_dialog import GroupsDialog
 from logdelve.widgets.help_screen import HelpScreen
 from logdelve.widgets.log_view import LogView
-from logdelve.widgets.search_dialog import SearchDialog
+from logdelve.widgets.navigation_dialog import NavigationDialog
 from logdelve.widgets.session_dialog import SessionAction, SessionActionType, SessionManageDialog
 from logdelve.widgets.status_bar import StatusBar
 from logdelve.widgets.theme_dialog import ThemeDialog
@@ -46,6 +46,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         Binding("x", "toggle_all_filters", "Filters off", show=False),
         Binding("slash", "search_forward", "Search", show=False),
         Binding("question_mark", "search_backward", "Search back", show=False),
+        Binding("colon", "goto_line", "Go to line", show=False),
+        Binding("at", "jump_to_time", "Jump to time", show=False),
         Binding("f", "filter_in", "Filter in", show=False),
         Binding("F", "filter_out", "Filter out", show=False),
         Binding("a", "analyze", "Analyze", show=False),
@@ -350,27 +352,51 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             return line.parsed_json
         return None
 
-    # --- Search actions ---
+    # --- Search & navigation actions ---
+
+    def _get_reference_date(self) -> datetime | None:
+        """Get a reference date from the log file's first timestamped line."""
+        log_view = self.query_one("#log-view", LogView)
+        for line in log_view._all_lines:  # noqa: SLF001
+            if line.timestamp is not None:
+                return line.timestamp
+        return None
+
+    def _open_navigation(self, direction: SearchDirection, initial_tab: str = "tab-search") -> None:
+        ref_date = self._get_reference_date()
+        self.push_screen(
+            NavigationDialog(direction, last_query=self._last_search, initial_tab=initial_tab, reference_date=ref_date),
+            callback=self._on_navigation_result,
+        )
 
     def action_search_forward(self) -> None:
-        self.push_screen(
-            SearchDialog(SearchDirection.FORWARD, last_query=self._last_search), callback=self._on_search_result
-        )
+        self._open_navigation(SearchDirection.FORWARD)
 
     def action_search_backward(self) -> None:
-        self.push_screen(
-            SearchDialog(SearchDirection.BACKWARD, last_query=self._last_search), callback=self._on_search_result
-        )
+        self._open_navigation(SearchDirection.BACKWARD)
 
-    def _on_search_result(self, result: SearchQuery | None) -> None:
+    def action_goto_line(self) -> None:
+        self._open_navigation(SearchDirection.FORWARD, initial_tab="tab-line")
+
+    def action_jump_to_time(self) -> None:
+        self._open_navigation(SearchDirection.FORWARD, initial_tab="tab-time")
+
+    def _on_navigation_result(self, result: SearchQuery | int | datetime | None) -> None:
         if result is None:
             return
-        self._last_search = result
-        filter_bar = self.query_one("#filter-bar", FilterBar)
-        filter_bar.set_search_text(result.pattern)
-        log_view = self.query_one("#log-view", LogView)
-        log_view.set_search(result)
-        self.update_search_status()
+        if isinstance(result, SearchQuery):
+            self._last_search = result
+            filter_bar = self.query_one("#filter-bar", FilterBar)
+            filter_bar.set_search_text(result.pattern)
+            log_view = self.query_one("#log-view", LogView)
+            log_view.set_search(result)
+            self.update_search_status()
+        elif isinstance(result, int):
+            log_view = self.query_one("#log-view", LogView)
+            log_view.jump_to_line(result)
+        elif isinstance(result, datetime):
+            log_view = self.query_one("#log-view", LogView)
+            log_view.jump_to_timestamp(result)
 
     # --- Filter actions ---
 
