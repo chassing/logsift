@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="logdelve" width="480">
+  <img src="https://raw.githubusercontent.com/chassing/logdelve/refs/heads/main/docs/logo.svg" alt="logdelve" width="480">
 </p>
 
 <p align="center">
@@ -39,6 +39,8 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[AWS CloudWatch](docs/guide.md#aws-cloudwatch)**: Download and list CloudWatch log groups, streams, and events with stream names
 
 📖 **[Full User Guide](docs/guide.md)** — detailed documentation for all features with examples
+
+🎬 **[Demo Videos](docs/demos/index.md)** — step-by-step workflow walkthroughs: [You Just Got Paged](docs/demos/you-just-got-paged.md) · [What Changed?](docs/demos/what-changed.md) · [Post-Mortem](docs/demos/post-mortem.md)
 
 ## Installation
 

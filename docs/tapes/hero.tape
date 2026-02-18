@@ -67,6 +67,7 @@ Type "f"
 Sleep 3s
 Down@300ms 4
 Sleep 1s
+Space
 Enter
 Ctrl+B
 Sleep 4s
