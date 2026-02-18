@@ -34,10 +34,17 @@ if TYPE_CHECKING:
     from logdelve.parsers import LogParser
 _ANALYZE_LINE_THRESHOLD = 10_000
 _TRACE_ID_KEYS = (
-    "trace_id", "traceId", "traceID",
-    "request_id", "requestId", "requestID",
-    "correlation_id", "correlationId", "correlationID",
-    "span_id", "spanId",
+    "trace_id",
+    "traceId",
+    "traceID",
+    "request_id",
+    "requestId",
+    "requestID",
+    "correlation_id",
+    "correlationId",
+    "correlationID",
+    "span_id",
+    "spanId",
     "x-request-id",
 )
 
@@ -63,6 +70,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         Binding("right_square_bracket", "next_bookmark", "Next bookmark", show=False),
         Binding("A", "annotate", "Annotate", show=False),
         Binding("r", "show_related", "Related", show=False),
+        Binding("ctrl+e", "export", "Export"),
         Binding("a", "analyze", "Analyze", show=False),
         Binding("m", "manage_filters", "Filters", show=False),
         Binding("t", "toggle_theme", "Theme", show=False),
@@ -613,6 +621,45 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         session.bookmarks = dict(bookmarks)
         session.source_files = self._source_files
         save_session(session)
+
+    # --- Export ---
+
+    def action_export(self) -> None:
+        """Open export dialog."""
+        from logdelve.widgets.export_dialog import ExportDialog  # noqa: PLC0415
+
+        log_view = self.query_one("#log-view", LogView)
+        has_bookmarks = log_view.bookmark_count > 0
+        self.push_screen(ExportDialog(has_bookmarks=has_bookmarks), callback=self._on_export_result)
+
+    def _on_export_result(self, result: object) -> None:
+        from pathlib import Path  # noqa: PLC0415
+
+        from logdelve.export import export_lines  # noqa: PLC0415
+        from logdelve.widgets.export_dialog import ExportResult  # noqa: PLC0415
+
+        if not isinstance(result, ExportResult):
+            return
+
+        log_view = self.query_one("#log-view", LogView)
+
+        # Collect lines based on scope
+        if result.scope == "all":
+            lines = log_view._all_lines  # noqa: SLF001
+        elif result.scope == "bookmarked":
+            bookmarks = log_view.get_bookmarks()
+            all_lines = log_view._all_lines  # noqa: SLF001
+            lines = [all_lines[i] for i in sorted(bookmarks.keys()) if i < len(all_lines)]
+        else:  # visible
+            lines = log_view.lines
+
+        try:
+            count = export_lines(lines, result.fmt, Path(result.path))
+            self.notify(f"Exported {count} lines to {result.path}")
+        except NotImplementedError as e:
+            self.notify(str(e), severity="error")
+        except OSError as e:
+            self.notify(f"Export failed: {e}", severity="error")
 
     # --- Trace correlation ---
 

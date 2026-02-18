@@ -119,7 +119,9 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
 
     def compose(self) -> ComposeResult:
         self._titles = {
-            "tab-search": "🔍 Search forward (/)" if self._direction == SearchDirection.FORWARD else "🔍 Search backward (?)",
+            "tab-search": "🔍 Search forward (/)"
+            if self._direction == SearchDirection.FORWARD
+            else "🔍 Search backward (?)",
             "tab-line": "Go to line (:)",
             "tab-time": "Jump to timestamp (@)",
             "tab-bookmarks": f"Bookmarks ({len(self._bookmarks)})",

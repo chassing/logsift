@@ -64,6 +64,10 @@ HELP_TEXT = """\
   Filters are auto-saved as sessions.
   CLI: --start/-S and --end/-E for time range on startup.
 
+[bold]Export[/bold]
+  Ctrl+E                                Export filtered lines to file
+  CLI: --output/-o FILE --format FORMAT (text, json, jsonl, csv)
+
 [bold]Tailing[/bold]
   p                                     Pause/resume tailing
   G                                     Jump to bottom (follow new lines)

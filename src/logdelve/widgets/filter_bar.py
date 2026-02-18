@@ -69,7 +69,9 @@ class FilterBar(Widget):
 
         # Search
         if self._search_text:
-            display = self._search_text[:_MAX_SEARCH_DISPLAY_LEN] + ("…" if len(self._search_text) > _MAX_SEARCH_DISPLAY_LEN else "")
+            display = self._search_text[:_MAX_SEARCH_DISPLAY_LEN] + (
+                "…" if len(self._search_text) > _MAX_SEARCH_DISPLAY_LEN else ""
+            )
             text.append(f" /? 🔍 {display}", style="bold cyan")
             text.append(f"{s}n/N ↕", style="dim")
         else:
@@ -105,7 +107,7 @@ class FilterBar(Widget):
             text.append(f"{s}b/B 📌", style="dim")
 
         # Right-aligned shortcuts
-        shortcuts = " @ ⏱  : 📍  r 🔗  a 📊  h ❓"
+        shortcuts = " @ ⏱  : 📍  r 🔗  a 📊"
         used = len(text.plain)
         padding = max(1, self.size.width - used - len(shortcuts))
         text.append(" " * padding)

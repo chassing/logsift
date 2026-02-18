@@ -14,8 +14,9 @@ from logdelve.parsers import ParserName, detect_parser, get_parser
 from logdelve.reader import is_pipe, read_file, read_file_initial
 
 if TYPE_CHECKING:
-    from logdelve.models import LogLine
     from logdelve.parsers import LogParser
+
+from logdelve.models import FilterRule, FilterType, LogLine
 
 _CHUNKED_THRESHOLD = 1_000_000  # 1MB
 _TIMESTAMP_MIN = datetime.min.replace(tzinfo=UTC)
@@ -66,6 +67,75 @@ def _sort_and_renumber(lines: list[LogLine]) -> None:
         line.line_number = i + 1
 
 
+def _run_export(
+    files: list[Path],
+    parser_name: ParserName,
+    session_name: str | None,
+    start: str | None,
+    end: str | None,
+    output: Path,
+    fmt: str,
+) -> None:
+    """Export filtered lines to file without TUI."""
+    from logdelve.export import ExportFormat, export_lines  # noqa: PLC0415
+    from logdelve.filters import apply_filters  # noqa: PLC0415
+    from logdelve.utils import parse_time  # noqa: PLC0415
+
+    try:
+        export_fmt = ExportFormat(fmt)
+    except ValueError:
+        typer.echo(f"Error: unknown format '{fmt}'. Use: text, json, jsonl, csv")
+        raise typer.Exit(1)  # noqa: B904
+
+    # Read all files
+    all_lines: list[LogLine] = []
+    for f in files:
+        file_parser = _resolve_parser(parser_name, f)
+        all_lines.extend(read_file(f, parser=file_parser))
+
+    # Apply session filters
+    rules: list[FilterRule] = []
+    if session_name:
+        from logdelve.session import load_session  # noqa: PLC0415
+
+        try:
+            session = load_session(session_name)
+            rules = list(session.filters)
+        except FileNotFoundError:
+            typer.echo(f"Error: session '{session_name}' not found")
+            raise typer.Exit(1)  # noqa: B904
+
+    # Apply time range filter
+    if start or end:
+        ref_date = next((line.timestamp for line in all_lines if line.timestamp), None)
+        time_start = parse_time(start, reference_date=ref_date).isoformat() if start else None
+        time_end = parse_time(end, reference_date=ref_date).isoformat() if end else None
+        rules.append(
+            FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern=f"Time: {start or ''} - {end or ''}",
+                is_time_range=True,
+                time_start=time_start,
+                time_end=time_end,
+            )
+        )
+
+    # Filter
+    if rules:
+        indices = apply_filters(all_lines, rules)
+        lines = [all_lines[i] for i in indices]
+    else:
+        lines = all_lines
+
+    # Export
+    try:
+        count = export_lines(lines, export_fmt, output)
+        typer.echo(f"Exported {count} lines to {output}")
+    except NotImplementedError as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)  # noqa: B904
+
+
 def _run_multi_file(
     files: list[Path],
     parser: ParserName,
@@ -105,7 +175,7 @@ def _run_multi_file(
     log_app.run(mouse=False)
 
 
-def inspect(  # noqa: C901
+def inspect(  # noqa: C901, PLR0912
     files: Annotated[list[Path] | None, typer.Argument(help="Log file(s) to view")] = None,
     session: Annotated[str | None, typer.Option("--session", "-s", help="Load a saved filter session")] = None,
     tail: Annotated[bool, typer.Option("--tail", "-t", help="Tail the log file (follow new lines)")] = False,  # noqa: FBT002
@@ -117,6 +187,10 @@ def inspect(  # noqa: C901
     ] = ParserName.AUTO,
     start: Annotated[str | None, typer.Option("--start", "-S", help="Start of time range filter (inclusive)")] = None,
     end: Annotated[str | None, typer.Option("--end", "-E", help="End of time range filter (exclusive)")] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", "-o", help="Export filtered lines to file (no TUI)")
+    ] = None,
+    fmt: Annotated[str, typer.Option("--format", help="Export format: raw")] = "raw",
 ) -> None:
     """View and filter log lines in a terminal UI."""
     if files:
@@ -132,6 +206,11 @@ def inspect(  # noqa: C901
     if tail and files and len(files) > 1:
         typer.echo("Error: --tail is only supported with a single file")
         raise typer.Exit(1)
+
+    # CLI export mode (no TUI)
+    if output is not None and files:
+        _run_export(files, parser, session, start, end, output, fmt)
+        return
 
     # Multi-file mode
     if files and len(files) > 1:

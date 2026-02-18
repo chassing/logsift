@@ -76,6 +76,9 @@ logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
 # Filter by time range
 logdelve inspect --start "14:30" --end "14:35" app.log
 
+# Export filtered lines to file
+logdelve inspect --session my-session --output export.log app.log
+
 # Compare against a known-good baseline
 logdelve inspect --baseline yesterday.log today.log
 ```

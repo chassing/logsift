@@ -15,6 +15,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [Navigation, Search & Display](#navigation-search--display)
 - [Bookmarks & Annotations](#bookmarks--annotations)
 - [Filtering](#filtering)
+- [Export](#export)
 - [Filter Management](#filter-management)
 - [Message Analysis](#message-analysis)
 - [Anomaly Detection](#anomaly-detection)
@@ -510,6 +511,28 @@ Use `--baseline` to load a known-good file, then press `a` to see which message 
 
 **Quick context check:**
 Press `x` to suspend all filters and see surrounding lines. Review the context. Press `x` again to restore all filters exactly as before.
+
+---
+
+## Export
+
+Press `Ctrl+E` to export the current view to a file. The export dialog lets you choose:
+
+- **Format**: Raw text (default). JSON, JSONL, CSV planned for future.
+- **Scope**: Visible lines (filtered), All lines, or Bookmarked lines only
+- **Output path**: File path with auto-generated default name
+
+### CLI export
+
+Export from the command line without opening the TUI:
+
+```bash
+logdelve inspect --output export.log app.log
+logdelve inspect --session my-session --output export.log app.log
+logdelve inspect --start "14:30" --end "14:35" --output filtered.log app.log
+```
+
+Use `--format` to specify the export format (default: `text`).
 
 ---
 
