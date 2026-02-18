@@ -2,40 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-02-18
 
 ### Added
 
-- **Anomaly detection**: `--baseline` option compares current logs against a known-good baseline
+- **Multiple file input**: merge multiple log files chronologically with `logdelve inspect a.log b.log`
+- **Bookmarks & annotations**: `b` to bookmark, `A` to annotate, `[`/`]` to navigate, `B` to list
+- **Export**: `Ctrl+E` to export visible/all/bookmarked lines; `--output/-o` for CLI export
+- **Trace ID correlation**: `r` to filter by `request_id`/`trace_id` from the current JSON line
+- **Time range filter**: filter by start/end timestamp via Time tab in filter dialog, or `--start/-S` / `--end/-E` on CLI
+- **Tabbed navigation dialog**: `/`, `?`, `:`, `@` open Search, Line, and Time tabs in a single dialog
+- **Go to line**: `:` to jump to a specific line number
+- **Jump to timestamp**: `@` to jump to a timestamp (supports natural language like `5m`, `14:30`)
+- **Component filter tab**: filter by component via Component tab in filter dialog
+- **Anomaly detection**: `--baseline` compares current logs against a known-good baseline
 - **Anomaly display**: red `▌` marker on anomalous lines, auto-enabled anomaly filter, `!` to toggle
-- **Log level detection**: automatic extraction from JSON fields and text patterns, color-coded line backgrounds
+- **Log level detection**: automatic extraction from JSON fields and text patterns, color-coded backgrounds
 - **Log level filter**: `e` to cycle minimum level (ALL → ERROR → WARN → INFO)
-- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags (`c` to cycle)
-- **Message analysis dialog**: `a` to open, groups log messages by event pattern
-- **Field analysis**: `m` to switch mode, JSON field value distributions with =0/>0 buckets for integers
-- **Analyze controls**: separate mode (`m`), sort (`s`), reverse (`r`) controls
-- **Filter edit**: `e` in filter manager to edit a filter's pattern inline
-- **Filter suspend/resume**: `x` suspends ALL filters (rules, level, anomaly), `x` again restores
-- **Cursor preservation**: filter toggles (`x`, `!`, `e`) keep cursor on the same log line, centered on screen
-- **Search persistence**: search dialog pre-fills with last search (pattern, case-sensitive, regex)
-- **Toolbar bar**: always-visible top bar with shortcuts, active search text, level/anomaly/filter status
-- **CloudWatch stream names**: `[stream-name]` prefix in cloudwatch get output
-- **Flexible time parsing**: `dateparser` integration for natural language dates ("yesterday at 8am", "friday", "2 days ago", "Feb 13 2026 7:58")
-- **Compact timestamp**: HH:MM:SS instead of full ISO in log view
+- **Component detection**: Kubernetes pods, Docker Compose services, JSON fields — color-coded tags (`c` to cycle)
+- **Message analysis**: `a` to open, groups log messages by event pattern with field value distributions
+- **Large file support**: chunked background loading for files >1MB with instant startup
+- **Filter suspend/resume**: `x` suspends ALL filters, `x` again restores
+- **Cursor preservation**: filter toggles keep cursor on the same log line
 - **Parser plugins**: pluggable log format parsers with auto-detection — ISO 8601, syslog, Apache CLF, Docker Compose, Kubernetes, journalctl, Python logging, logfmt
-- **Format selection**: `--parser/-p` option to force a specific log format
-- **Syslog component extraction**: hostname and program name (`program[pid]`) from syslog lines
-- **Text expand**: Enter on text lines shows full raw line below the compact view
-- **Level heuristics**: detect ERROR/WARN from keywords (fail, refused, timeout, deprecated) when no explicit level
+- **Format selection**: `--parser/-p` to force a specific log format
+- **Flexible time parsing**: `dateparser` for natural language ("yesterday at 8am", "friday", "2 days ago")
+- **Compact timestamp**: HH:MM:SS instead of full ISO in log view
+- **Toolbar**: always-visible top bar with shortcuts, active search text, level/anomaly/filter status
+- **Config dir override**: `LOGDELVE_CONFIG_DIR` environment variable
 
 ### Changed
 
-- **Tailing default**: files are read once by default, use `--tail/-t` to follow new lines; pipe input tails automatically (was: tailing on by default with `--no-tail` to disable)
+- **Tailing default**: files are read once by default, use `--tail/-t` to follow; pipe input tails automatically
+- **Trace correlation**: `r` now resets the log level filter to ALL so the full request lifecycle is visible
 - **CloudWatch output**: includes stream name as `[stream-name]` prefix for component detection
-- **Default log level**: lines with timestamp but no detected level default to INFO
 - **Filter bar**: always visible toolbar replaces hidden filter-only bar
-- **Filter manager**: shows case-sensitive indicator `[Aa]`
-- **README**: rewritten with use cases, outage investigation workflow, CloudWatch examples
 
 ## [0.2.0] - 2026-02-16
 
