@@ -6,7 +6,7 @@ from datetime import datetime  # noqa: TC003 - Pydantic needs this at runtime fo
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 
 class ContentType(StrEnum):
@@ -34,10 +34,16 @@ class LogLine(BaseModel):
     raw: str
     timestamp: datetime | None = None
     content_type: ContentType
-    content: str
+    content_offset: int = 0
     parsed_json: dict[str, Any] | None = None
     log_level: LogLevel | None = None
     component: str | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def content(self) -> str:
+        """Content portion of the line (raw without timestamp prefix)."""
+        return self.raw[self.content_offset :]
 
 
 class FilterType(StrEnum):

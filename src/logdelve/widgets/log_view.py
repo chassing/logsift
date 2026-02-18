@@ -688,7 +688,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         if search_matches and search_match_style:
             # Render content with search match highlighting
             # Matches are in raw offsets; compute content offset
-            content_start = len(line.raw) - len(line.content) if line.timestamp else 0
+            content_start = line.content_offset
             content_text = line.content
 
             # Collect match ranges that overlap with content portion

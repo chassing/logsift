@@ -18,7 +18,6 @@ def _make_line(
         line_number=line_number,
         raw=content,
         content_type=content_type,
-        content=content,
         parsed_json=parsed_json,
     )
 

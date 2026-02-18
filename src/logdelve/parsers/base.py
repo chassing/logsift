@@ -120,7 +120,6 @@ class LogParser(ABC):
                 raw=raw,
                 timestamp=None,
                 content_type=content_type,
-                content=raw,
                 parsed_json=parsed_json,
                 log_level=log_level,
                 component=None,
@@ -128,12 +127,14 @@ class LogParser(ABC):
         # Default to INFO for lines with a timestamp but no detected level
         if result.log_level is None and result.timestamp is not None:
             result.log_level = LogLevel.INFO
+        # Compute content offset: content is always a suffix of raw
+        content_offset = len(raw) - len(result.content)
         return LogLine(
             line_number=line_number,
             raw=raw,
             timestamp=result.timestamp,
             content_type=result.content_type,
-            content=result.content,
+            content_offset=content_offset,
             parsed_json=result.parsed_json,
             log_level=result.log_level,
             component=result.component,

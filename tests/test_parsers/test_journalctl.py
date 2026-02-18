@@ -19,10 +19,13 @@ class TestJournalctlParserTryParse:
             "SYSLOG_IDENTIFIER": "systemd",
             "PRIORITY": "6",
         }
-        result = self.parser.try_parse(json.dumps(data))
+        raw = json.dumps(data)
+        result = self.parser.try_parse(raw)
         assert result is not None
         assert result.timestamp is not None
-        assert result.content == "Service started"
+        assert result.content == raw
+        assert result.parsed_json is not None
+        assert result.parsed_json["MESSAGE"] == "Service started"
         assert result.component == "systemd"
         assert result.log_level == LogLevel.INFO
 

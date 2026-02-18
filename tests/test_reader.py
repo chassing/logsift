@@ -87,9 +87,7 @@ class TestReadFileRemainingAsync:
     async def test_remaining_skips_initial(self, tmp_path: Path) -> None:
         log_file = tmp_path / "large.log"
         log_file.write_text("\n".join(f"line {i}" for i in range(50)) + "\n")
-        chunks: list[list] = []
-        async for chunk in read_file_remaining_async(log_file, skip=10, chunk_size=20):
-            chunks.append(chunk)
+        chunks = [chunk async for chunk in read_file_remaining_async(log_file, skip=10, chunk_size=20)]
         total = sum(len(c) for c in chunks)
         assert total == 40  # 50 - 10 skipped
         # First line in first chunk should be line 10 (line_number=11)
@@ -100,9 +98,7 @@ class TestReadFileRemainingAsync:
     async def test_remaining_yields_chunks(self, tmp_path: Path) -> None:
         log_file = tmp_path / "large.log"
         log_file.write_text("\n".join(f"line {i}" for i in range(100)) + "\n")
-        chunks: list[list] = []
-        async for chunk in read_file_remaining_async(log_file, skip=0, chunk_size=30):
-            chunks.append(chunk)
+        chunks = [chunk async for chunk in read_file_remaining_async(log_file, skip=0, chunk_size=30)]
         assert len(chunks) == 4  # 30 + 30 + 30 + 10
         assert len(chunks[0]) == 30
         assert len(chunks[-1]) == 10
@@ -111,9 +107,7 @@ class TestReadFileRemainingAsync:
     async def test_remaining_nothing_to_read(self, tmp_path: Path) -> None:
         log_file = tmp_path / "small.log"
         log_file.write_text("line 1\nline 2\n")
-        chunks: list[list] = []
-        async for chunk in read_file_remaining_async(log_file, skip=10, chunk_size=100):
-            chunks.append(chunk)
+        chunks = [chunk async for chunk in read_file_remaining_async(log_file, skip=10, chunk_size=100)]
         assert len(chunks) == 0
 
 

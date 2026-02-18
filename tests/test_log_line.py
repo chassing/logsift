@@ -11,12 +11,13 @@ from logdelve.widgets.log_line import get_line_height, render_json_expanded
 def _make_json_line(line_number: int = 1, json_str: str = '{"key": "value"}') -> LogLine:
     import json
 
+    raw = f"2024-01-15T10:30:00Z {json_str}"
     return LogLine(
         line_number=line_number,
-        raw=f"2024-01-15T10:30:00Z {json_str}",
+        raw=raw,
         timestamp=None,
         content_type=ContentType.JSON,
-        content=json_str,
+        content_offset=len("2024-01-15T10:30:00Z "),
         parsed_json=json.loads(json_str),
     )
 
@@ -27,7 +28,7 @@ def _make_text_line(line_number: int = 1) -> LogLine:
         raw="2024-01-15T10:30:00Z plain text",
         timestamp=None,
         content_type=ContentType.TEXT,
-        content="plain text",
+        content_offset=len("2024-01-15T10:30:00Z "),
     )
 
 
@@ -54,7 +55,6 @@ class TestGetLineHeight:
             line_number=1,
             raw="{}",
             content_type=ContentType.JSON,
-            content="{}",
             parsed_json=None,
         )
         # JSON without parsed data falls through to text expand (height 2)
@@ -82,7 +82,6 @@ class TestRenderJsonExpanded:
             line_number=1,
             raw="{}",
             content_type=ContentType.JSON,
-            content="{}",
             parsed_json=None,
         )
         strips = render_json_expanded(line, 80, Style(dim=True), Style(color="cyan"), Style())

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
-from typing import Any, override
+from typing import override
 
 from logdelve.models import ContentType, LogLevel
 from logdelve.parsers.base import (
     LogParser,
     ParseResult,
+    classify_content,
     extract_log_level,
 )
 
@@ -43,16 +43,12 @@ class JournalctlParser(LogParser):
 
     @override
     def try_parse(self, raw: str) -> ParseResult | None:
-        stripped = raw.strip()
-        if not stripped.startswith("{"):
-            return None
-        try:
-            data: dict[str, Any] = json.loads(stripped)
-        except (json.JSONDecodeError, ValueError):
+        content_type, parsed_json = classify_content(raw)
+        if content_type != ContentType.JSON or parsed_json is None:
             return None
 
         # Must have at least __REALTIME_TIMESTAMP or _SOURCE_REALTIME_TIMESTAMP
-        ts_str = data.get("__REALTIME_TIMESTAMP") or data.get("_SOURCE_REALTIME_TIMESTAMP")
+        ts_str = parsed_json.get("__REALTIME_TIMESTAMP") or parsed_json.get("_SOURCE_REALTIME_TIMESTAMP")
         if ts_str is None:
             return None
 
@@ -62,29 +58,26 @@ class JournalctlParser(LogParser):
         except (ValueError, OSError):
             return None
 
-        message = data.get("MESSAGE", "")
-        if isinstance(message, list):
-            # journalctl sometimes returns MESSAGE as list of byte values
-            message = str(message)
-
         # Extract component from SYSLOG_IDENTIFIER or _COMM
-        component = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM")
+        component = parsed_json.get("SYSLOG_IDENTIFIER") or parsed_json.get("_COMM")
 
         # Extract log level from PRIORITY
         log_level = None
-        priority = data.get("PRIORITY")
+        priority = parsed_json.get("PRIORITY")
         if priority is not None:
             log_level = _PRIORITY_MAP.get(str(priority))
 
-        # If no level from PRIORITY, try common level fields in MESSAGE
-        if log_level is None and message:
-            log_level = extract_log_level(message, None)
+        # If no level from PRIORITY, try MESSAGE text
+        if log_level is None:
+            message = parsed_json.get("MESSAGE", "")
+            if isinstance(message, str) and message:
+                log_level = extract_log_level(message, None)
 
         return ParseResult(
             timestamp=ts,
-            content=message,
+            content=raw,
             content_type=ContentType.JSON,
-            parsed_json=data,
+            parsed_json=parsed_json,
             log_level=log_level,
             component=component,
         )

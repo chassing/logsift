@@ -11,7 +11,6 @@ def _make_line(line_number: int, raw: str) -> LogLine:
         line_number=line_number,
         raw=raw,
         content_type=ContentType.TEXT,
-        content=raw,
     )
 
 
@@ -100,14 +99,12 @@ JSON_LINES = [
         line_number=1,
         raw='{"log_level": "info", "msg": "ok"}',
         content_type=ContentType.JSON,
-        content='{"log_level": "info", "msg": "ok"}',
         parsed_json={"log_level": "info", "msg": "ok"},
     ),
     LogLine(
         line_number=2,
         raw='{"log_level": "error", "msg": "fail"}',
         content_type=ContentType.JSON,
-        content='{"log_level": "error", "msg": "fail"}',
         parsed_json={"log_level": "error", "msg": "fail"},
     ),
     _make_line(3, "plain text no json"),
@@ -175,7 +172,6 @@ def _make_component_line(line_number: int, raw: str, component: str | None) -> L
         line_number=line_number,
         raw=raw,
         content_type=ContentType.TEXT,
-        content=raw,
         component=component,
     )
 
