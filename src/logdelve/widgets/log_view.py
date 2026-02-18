@@ -91,6 +91,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         background: #5c1015;
         text-style: bold;
     }
+
+    LogView > .logview--bookmark {
+        color: #e5c07b;
+        text-style: bold;
+    }
     """
 
     COMPONENT_CLASSES: ClassVar[set[str]] = {
@@ -105,6 +110,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         "logview--level-warn",
         "logview--level-debug",
         "logview--level-fatal",
+        "logview--bookmark",
     }
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -155,11 +161,13 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self._search_current: int = -1
         # Pre-computed: matches grouped by visible line index for fast render lookup
         self._search_matches_by_line: dict[int, list[tuple[int, int]]] = {}
+        # Bookmarks: original line index → annotation text (empty = no annotation)
+        self._bookmarks: dict[int, str] = {}
 
     @property
     def lines(self) -> list[LogLine]:
         """Get the currently visible lines (filtered or all)."""
-        if self._filtered_indices and self.has_filters:
+        if self.has_filters:
             return [self._all_lines[i] for i in self._filtered_indices]
         return self._all_lines
 
@@ -417,6 +425,10 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         for i, line in enumerate(visible):
             expanded = self._is_expanded(i)
             h = get_line_height(line, expanded=expanded)
+            # Add extra row for annotation text
+            orig_idx = self._filtered_indices[i] if self._filtered_indices else i
+            if self._bookmarks.get(orig_idx):
+                h += 1
             self._heights.append(h)
             self._offsets.append(offset)
             offset += h
@@ -543,7 +555,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
     # --- Rendering ---
 
-    def render_line(self, y: int) -> Strip:  # noqa: PLR0914
+    def render_line(self, y: int) -> Strip:  # noqa: PLR0914, C901, PLR0912, PLR0915
         scroll_x, scroll_y = self.scroll_offset
         display_row = scroll_y + y
         content_width = self.scrollable_content_region.width
@@ -618,8 +630,18 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 current_match_offsets,
                 search_current_style,
                 is_anomaly=is_anomaly,
+                orig_idx=orig_idx,
             )
             strip = Strip(segments)
+
+        # Check if this sub_row is the annotation row (last row of an annotated bookmark)
+        orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
+        if self._bookmarks.get(orig_idx):
+            line_height = self._heights[line_index] if line_index < len(self._heights) else 1
+            if sub_row == line_height - 1:
+                annotation_text = f"    >> {self._bookmarks[orig_idx]}"
+                annotation_style = Style(color="#56b6c2", italic=True)
+                strip = Strip([Segment(annotation_text, annotation_style + bg_style)])
 
         strip = strip.crop(scroll_x, scroll_x + content_width)
         if bg_style != Style():
@@ -631,7 +653,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         return strip
 
-    def _render_compact_line(  # noqa: C901, PLR0912
+    def _render_compact_line(  # noqa: C901, PLR0912, PLR0915, PLR0914
         self,
         line: LogLine,
         lineno_style: Style,
@@ -645,6 +667,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         search_current_style: Style | None = None,
         *,
         is_anomaly: bool = False,
+        orig_idx: int = 0,
     ) -> list[Segment]:
         """Render a single compact log line with optional search highlighting."""
         segments: list[Segment] = []
@@ -654,6 +677,15 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             segments.append(Segment("▌", Style(color="red", bold=True)))
         elif self._anomaly_scores:
             segments.append(Segment(" ", bg_style))
+
+        # Bookmark marker
+        if self._bookmarks:
+            if orig_idx in self._bookmarks:
+                annotation = self._bookmarks[orig_idx]
+                marker = "# " if annotation else "* "
+                segments.append(Segment(marker, self.get_component_rich_style("logview--bookmark") + bg_style))
+            else:
+                segments.append(Segment("  ", bg_style))
 
         if self._show_line_numbers:
             if line.source_line_number is not None:
@@ -905,3 +937,84 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         if visible:
             self.cursor_line = len(visible) - 1
             self._scroll_cursor_center()
+
+    # --- Bookmarks ---
+
+    def toggle_bookmark(self) -> bool | None:
+        """Toggle bookmark on the current cursor line. Returns True if bookmarked, False if removed, None if no line."""
+        orig_idx = self.cursor_orig_index()
+        if orig_idx is None:
+            return None
+        if orig_idx in self._bookmarks:
+            had_annotation = bool(self._bookmarks[orig_idx])
+            del self._bookmarks[orig_idx]
+            if had_annotation:
+                self._recompute_heights()
+            self.refresh()
+            return False
+        self._bookmarks[orig_idx] = ""
+        self.refresh()
+        return True
+
+    def set_annotation(self, orig_idx: int, text: str) -> None:
+        """Set or update annotation on a bookmarked line."""
+        self._bookmarks[orig_idx] = text
+        self._recompute_heights()
+        self.refresh()
+
+    def get_annotation(self, orig_idx: int) -> str | None:
+        """Get annotation text for a bookmarked line, or None if not bookmarked."""
+        return self._bookmarks.get(orig_idx)
+
+    def get_bookmarks(self) -> dict[int, str]:
+        """Get all bookmarks (original line index → annotation)."""
+        return self._bookmarks
+
+    def set_bookmarks(self, bookmarks: dict[int, str]) -> None:
+        """Set bookmarks (for session restore)."""
+        self._bookmarks = bookmarks
+        self._recompute_heights()
+        self.refresh()
+
+    @property
+    def bookmark_count(self) -> int:
+        """Number of bookmarked lines."""
+        return len(self._bookmarks)
+
+    def next_bookmark(self) -> None:
+        """Jump to the next bookmarked line from cursor position."""
+        if not self._bookmarks:
+            return
+        visible = self.lines
+        for i in range(self.cursor_line + 1, len(visible)):
+            orig_idx = self._filtered_indices[i] if self._filtered_indices else i
+            if orig_idx in self._bookmarks:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return
+        # Wrap around
+        for i in range(self.cursor_line + 1):
+            orig_idx = self._filtered_indices[i] if self._filtered_indices else i
+            if orig_idx in self._bookmarks:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return
+
+    def prev_bookmark(self) -> None:
+        """Jump to the previous bookmarked line from cursor position."""
+        if not self._bookmarks:
+            return
+        visible = self.lines
+        for i in range(self.cursor_line - 1, -1, -1):
+            orig_idx = self._filtered_indices[i] if self._filtered_indices else i
+            if orig_idx in self._bookmarks:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return
+        # Wrap around
+        for i in range(len(visible) - 1, self.cursor_line - 1, -1):
+            orig_idx = self._filtered_indices[i] if self._filtered_indices else i
+            if orig_idx in self._bookmarks:
+                self.cursor_line = i
+                self._scroll_cursor_center()
+                return

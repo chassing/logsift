@@ -57,6 +57,11 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         Binding("at", "jump_to_time", "Jump to time", show=False),
         Binding("f", "filter_in", "Filter in", show=False),
         Binding("F", "filter_out", "Filter out", show=False),
+        Binding("b", "toggle_bookmark", "Bookmark", show=False),
+        Binding("B", "list_bookmarks", "Bookmarks", show=False),
+        Binding("left_square_bracket", "prev_bookmark", "Prev bookmark", show=False),
+        Binding("right_square_bracket", "next_bookmark", "Next bookmark", show=False),
+        Binding("A", "annotate", "Annotate", show=False),
         Binding("r", "show_related", "Related", show=False),
         Binding("a", "analyze", "Analyze", show=False),
         Binding("m", "manage_filters", "Filters", show=False),
@@ -101,8 +106,26 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._lines = lines or []
         self._source = source
         self._filter_rules: list[FilterRule] = []
-        self._session_name = session_name or datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
+        # Auto-generate session name with filename
+        if session_name:
+            self._session_name = session_name
+        else:
+            ts = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
+            if file_paths:
+                stem = "-".join(f.stem for f in file_paths[:3])
+                self._session_name = f"{stem}-{ts}"
+            elif file_path:
+                self._session_name = f"{file_path.stem}-{ts}"
+            else:
+                self._session_name = f"pipe-{ts}"
         self._file_path = file_path
+        # Track source files for session management
+        if file_paths:
+            self._source_files = [f.name for f in file_paths]
+        elif file_path:
+            self._source_files = [file_path.name]
+        else:
+            self._source_files = ["pipe"]
         self._tail = tail
         self._pipe_fd = pipe_fd
         self._parser = parser
@@ -136,7 +159,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         yield StatusBar(source=self._source, id="status-bar")
         yield Footer()
 
-    def on_mount(self) -> None:  # noqa: C901
+    def on_mount(self) -> None:  # noqa: C901, PLR0912, PLR0915
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
 
@@ -151,6 +174,11 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         if self._session_name:
             try:
                 session = load_session(self._session_name)
+                # Restore bookmarks BEFORE filters (auto-save in _apply_filters would overwrite them)
+                if session.source_files == self._source_files and session.bookmarks:
+                    log_view.set_bookmarks(dict(session.bookmarks))
+                elif session.bookmarks and session.source_files != self._source_files:
+                    self.notify("Bookmarks skipped (different file)")
                 self._filter_rules = list(session.filters)
                 self._apply_filters()
                 self.notify(f"Session '{self._session_name}' loaded")
@@ -205,6 +233,11 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             self.run_worker(self._loading_worker(initial_count, estimated_total), exclusive=True)
 
         self._update_status_bar()
+
+    async def action_quit(self) -> None:
+        """Save session and quit."""
+        self._autosave_session()
+        self.exit()
 
     async def _tail_worker(self, reader: AsyncIterator[LogLine]) -> None:
         """Consume async line reader and append lines to the view."""
@@ -346,6 +379,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         if self._anomaly_result:
             status_bar.set_anomaly_count(self._anomaly_result.anomaly_count)
             filter_bar.set_anomaly_info(self._anomaly_result.anomaly_count, filter_active=log_view.anomaly_filter)
+        status_bar.set_bookmark_count(log_view.bookmark_count)
+        filter_bar.set_bookmark_count(log_view.bookmark_count)
 
     def update_search_status(self) -> None:
         """Update status bar with current search match info."""
@@ -364,14 +399,6 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         log_view.set_filters(self._filter_rules)
         filter_bar.update_filters(self._filter_rules)
         self._update_status_bar()
-        self._autosave_filters()
-
-    def _autosave_filters(self) -> None:
-        """Auto-save current filters under session name."""
-        if not self._filter_rules:
-            return
-        session = create_session(self._session_name, self._filter_rules)
-        save_session(session)
 
     def _add_filter(self, rule: FilterRule) -> None:
         self._filter_rules.append(rule)
@@ -400,8 +427,16 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
 
     def _open_navigation(self, direction: SearchDirection, initial_tab: str = "tab-search") -> None:
         ref_date = self._get_reference_date()
+        log_view = self.query_one("#log-view", LogView)
         self.push_screen(
-            NavigationDialog(direction, last_query=self._last_search, initial_tab=initial_tab, reference_date=ref_date),
+            NavigationDialog(
+                direction,
+                last_query=self._last_search,
+                initial_tab=initial_tab,
+                reference_date=ref_date,
+                bookmarks=log_view.get_bookmarks(),
+                all_lines=log_view._all_lines,  # noqa: SLF001
+            ),
             callback=self._on_navigation_result,
         )
 
@@ -461,6 +496,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             for rule in result:
                 self._filter_rules.append(rule)
             self._apply_filters()
+
         else:
             self._add_filter(result)
 
@@ -518,6 +554,66 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
 
         self._update_status_bar()
 
+    # --- Bookmarks & Annotations ---
+
+    def action_toggle_bookmark(self) -> None:
+        """Toggle bookmark on the current line."""
+        log_view = self.query_one("#log-view", LogView)
+        result = log_view.toggle_bookmark()
+        if result is None:
+            return
+        if result:
+            self.notify("Bookmarked")
+        else:
+            self.notify("Bookmark removed")
+        self._update_status_bar()
+
+    def action_prev_bookmark(self) -> None:
+        self.query_one("#log-view", LogView).prev_bookmark()
+
+    def action_next_bookmark(self) -> None:
+        self.query_one("#log-view", LogView).next_bookmark()
+
+    def action_list_bookmarks(self) -> None:
+        log_view = self.query_one("#log-view", LogView)
+        if not log_view.bookmark_count:
+            self.notify("No bookmarks", severity="warning")
+            return
+        self._open_navigation(SearchDirection.FORWARD, initial_tab="tab-bookmarks")
+
+    def action_annotate(self) -> None:
+        """Add or edit annotation on the current line."""
+        from logdelve.widgets.annotation_dialog import AnnotationDialog  # noqa: PLC0415
+
+        log_view = self.query_one("#log-view", LogView)
+        orig_idx = log_view.cursor_orig_index()
+        if orig_idx is None:
+            return
+        # Bookmark if not already
+        if orig_idx not in log_view.get_bookmarks():
+            log_view.toggle_bookmark()
+        existing = log_view.get_annotation(orig_idx) or ""
+        self.push_screen(AnnotationDialog(existing), callback=lambda text: self._on_annotation_result(orig_idx, text))
+
+    def _on_annotation_result(self, orig_idx: int, text: str | None) -> None:
+        if text is None:
+            return
+        log_view = self.query_one("#log-view", LogView)
+        log_view.set_annotation(orig_idx, text)
+
+        self._update_status_bar()
+
+    def _autosave_session(self) -> None:
+        """Auto-save current session (filters + bookmarks). Skip if nothing to save."""
+        log_view = self.query_one("#log-view", LogView)
+        bookmarks = log_view.get_bookmarks()
+        if not self._filter_rules and not bookmarks:
+            return
+        session = create_session(self._session_name, self._filter_rules)
+        session.bookmarks = dict(bookmarks)
+        session.source_files = self._source_files
+        save_session(session)
+
     # --- Trace correlation ---
 
     def action_show_related(self) -> None:
@@ -551,6 +647,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     # --- Session actions ---
 
     def action_manage_sessions(self) -> None:
+        self._autosave_session()
         self.push_screen(SessionManageDialog(current_session=self._session_name), callback=self._on_session_result)
 
     def _on_session_result(self, result: SessionAction | None) -> None:
@@ -565,15 +662,22 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             self._session_name = result.name
             self._filter_rules = list(session.filters)
             self._apply_filters()
-            self.notify(f"Session '{result.name}' loaded")
+            # Restore bookmarks if source files match
+            log_view = self.query_one("#log-view", LogView)
+            if session.source_files == self._source_files and session.bookmarks:
+                log_view.set_bookmarks(dict(session.bookmarks))
+                self.notify(f"Session '{result.name}' loaded")
+            elif session.bookmarks and session.source_files != self._source_files:
+                self.notify(f"Session '{result.name}' loaded (bookmarks skipped - different file)")
+            else:
+                self.notify(f"Session '{result.name}' loaded")
+            self._update_status_bar()
         elif result.action == SessionActionType.SAVE:
-            if not self._filter_rules:
-                self.notify("No filters to save", severity="warning")
-                return
             self._session_name = result.name
-            session = create_session(result.name, self._filter_rules)
-            save_session(session)
+            self._autosave_session()
             self.notify(f"Session '{result.name}' saved")
+        elif result.action == SessionActionType.RENAME:
+            self._session_name = result.name
 
     # --- Anomaly filter ---
 

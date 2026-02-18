@@ -45,6 +45,7 @@ class StatusBar(Widget):
         self._level_counts: dict[LogLevel, int] = {}
         self._min_level: LogLevel | None = None
         self._anomaly_count: int = 0
+        self._bookmark_count: int = 0
         self._loading_loaded: int | None = None
         self._loading_total: int | None = None
 
@@ -79,6 +80,11 @@ class StatusBar(Widget):
     def set_anomaly_count(self, count: int) -> None:
         """Set anomaly count."""
         self._anomaly_count = count
+        self.refresh()
+
+    def set_bookmark_count(self, count: int) -> None:
+        """Set bookmark count."""
+        self._bookmark_count = count
         self.refresh()
 
     def set_loading_progress(self, loaded: int, total: int | None = None) -> None:
@@ -147,6 +153,9 @@ class StatusBar(Widget):
 
         if self._anomaly_count > 0:
             text.append(f"  A:{self._anomaly_count}", style="bold red")
+
+        if self._bookmark_count > 0:
+            text.append(f"  B:{self._bookmark_count}", style="bold")
 
         right_part = self._source
         if right_part:

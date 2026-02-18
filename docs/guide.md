@@ -13,6 +13,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [Multiple Files](#multiple-files)
 - [Supported Log Formats](#supported-log-formats)
 - [Navigation, Search & Display](#navigation-search--display)
+- [Bookmarks & Annotations](#bookmarks--annotations)
 - [Filtering](#filtering)
 - [Filter Management](#filter-management)
 - [Message Analysis](#message-analysis)
@@ -401,6 +402,24 @@ Supported formats:
 When a time-only value like `14:30` is entered, the date is inferred from the log file's timestamps (not from today's date).
 
 The navigation dialog (`/`, `?`, `:`, `@`) is a tabbed interface — you can switch between Search, Line, and Time tabs with Tab/Shift-Tab.
+
+---
+
+## Bookmarks & Annotations
+
+Mark interesting lines during investigation and attach notes.
+
+| Key | Action                                             |
+| --- | -------------------------------------------------- |
+| `b` | Toggle bookmark on current line                    |
+| `B` | List all bookmarks (navigation dialog)             |
+| `A` | Add/edit annotation on current line                |
+| `[` | Jump to previous bookmark                          |
+| `]` | Jump to next bookmark                              |
+
+Bookmarked lines show a yellow `*` marker in the gutter. Lines with annotations show `#` instead and display the annotation text inline below the line.
+
+Bookmarks are persisted in the session. When loading a session for the same file, bookmarks are restored. For a different file, bookmarks are skipped.
 
 ---
 
@@ -867,6 +886,16 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 | Enter | Toggle JSON pretty-print (current line)    |
 | `#`   | Toggle line numbers                        |
 | `c`   | Cycle component display (tag / full / off) |
+
+### Bookmarks
+
+| Key     | Action                    |
+| ------- | ------------------------- |
+| `b`     | Toggle bookmark           |
+| `B`     | List bookmarks            |
+| `A`     | Add/edit annotation       |
+| `[`     | Previous bookmark         |
+| `]`     | Next bookmark             |
 
 ### Search
 

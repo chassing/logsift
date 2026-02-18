@@ -30,6 +30,7 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[Search](docs/guide.md#search)**: Forward/backward search with regex, case-sensitive options, and match highlighting
 - **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, component, or log level — tabbed dialog with multi-select
 - **[Filter management](docs/guide.md#filter-management)**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
+- **[Bookmarks & Annotations](docs/guide.md#bookmarks--annotations)**: Mark lines, attach notes, navigate between bookmarks, persisted in sessions
 - **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete filter sessions with auto-save
 - **[Streaming large files](docs/guide.md#large-files)**: Chunked background loading for files up to 2-3GB with instant startup and progress display
 - **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
@@ -173,7 +174,8 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 | `1`-`9`   | Toggle individual filter |     | `s`       | Session manager           |
 | `p`       | Pause / resume tailing   |     | `h`       | Help screen               |
 | `r`       | Show related (trace ID)  |     | `:`       | Go to line number         |
-| `@`       | Jump to timestamp        |     |           |                           |
+| `b` / `B` | Bookmark / list          |     | `A`       | Annotate bookmark         |
+| `[` / `]` | Prev / next bookmark     |     | `@`       | Jump to timestamp         |
 
 📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
 

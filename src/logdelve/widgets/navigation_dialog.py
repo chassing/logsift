@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
-from textual.widgets import Checkbox, Input, Label, TabbedContent, TabPane
+from textual.widgets import Checkbox, Input, Label, OptionList, TabbedContent, TabPane
+from textual.widgets.option_list import Option
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -28,8 +29,9 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
     }
 
     NavigationDialog > Vertical {
-        width: 80;
-        height: 22;
+        width: 90%;
+        height: 80%;
+        max-height: 35;
         background: $surface;
         border: tall $accent;
         padding: 1 2;
@@ -103,18 +105,24 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
         last_query: SearchQuery | None = None,
         initial_tab: str = "tab-search",
         reference_date: datetime | None = None,
+        bookmarks: dict[int, str] | None = None,
+        all_lines: list[Any] | None = None,
     ) -> None:
         super().__init__()
         self._direction = direction
         self._last_query = last_query
         self._initial_tab = initial_tab
         self._reference_date = reference_date
+        self._bookmarks = bookmarks or {}
+        self._all_lines = all_lines or []
+        self._bookmark_indices: list[int] = sorted(self._bookmarks.keys())
 
     def compose(self) -> ComposeResult:
         self._titles = {
             "tab-search": "🔍 Search forward (/)" if self._direction == SearchDirection.FORWARD else "🔍 Search backward (?)",
             "tab-line": "Go to line (:)",
             "tab-time": "Jump to timestamp (@)",
+            "tab-bookmarks": f"Bookmarks ({len(self._bookmarks)})",
         }
         label = self._titles.get(self._initial_tab, self._titles["tab-search"])
         with Vertical():
@@ -127,6 +135,8 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
                     yield from self._compose_line_tab()
                 with TabPane("Time", id="tab-time"):
                     yield from self._compose_time_tab()
+                with TabPane("Bookmarks", id="tab-bookmarks"):
+                    yield from self._compose_bookmarks_tab()
 
             yield Label("Enter to apply, Escape to cancel", classes="hint")
 
@@ -145,6 +155,20 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
 
     def _compose_time_tab(self) -> ComposeResult:
         yield TimestampInput(id="ts-widget", reference_date=self._reference_date)
+
+    def _compose_bookmarks_tab(self) -> ComposeResult:
+        ol = OptionList(id="bookmark-list")
+        for orig_idx in self._bookmark_indices:
+            if orig_idx < len(self._all_lines):
+                line = self._all_lines[orig_idx]
+                ts = line.timestamp.strftime("%H:%M:%S") if line.timestamp else "        "
+                preview = line.content[:120]
+                annotation = self._bookmarks.get(orig_idx, "")
+                label = f"{line.line_number:>6} {ts} {preview}"
+                if annotation:
+                    label += f"\n       >> {annotation}"
+                ol.add_option(Option(label))
+        yield ol
 
     def on_mount(self) -> None:
         self._focus_active_tab_content()
@@ -184,6 +208,13 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
             event.prevent_default()
             event.stop()
             self._submit_search()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Handle bookmark selection."""
+        if event.option_list.id == "bookmark-list" and event.option_index < len(self._bookmark_indices):
+            orig_idx = self._bookmark_indices[event.option_index]
+            if orig_idx < len(self._all_lines):
+                self.dismiss(self._all_lines[orig_idx].line_number)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         input_id = event.input.id

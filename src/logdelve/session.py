@@ -25,6 +25,8 @@ def save_session(session: Session) -> Path:
         "created_at": session.created_at.isoformat(),
         "updated_at": session.updated_at.isoformat(),
         "filters": [_filter_to_dict(f) for f in session.filters],
+        "source_files": session.source_files,
+        "bookmarks": {str(k): v for k, v in session.bookmarks.items()},
     }
 
     path.write_bytes(tomli_w.dumps(data).encode())
@@ -43,9 +45,15 @@ def load_session(name: str) -> Session:
     data = tomllib.loads(path.read_text())
     filters = [_dict_to_filter(f) for f in data.get("filters", [])]
 
+    # Deserialize bookmarks (keys are strings in TOML, convert to int)
+    raw_bookmarks = data.get("bookmarks", {})
+    bookmarks = {int(k): v for k, v in raw_bookmarks.items()}
+
     return Session(
         name=data["name"],
         filters=filters,
+        bookmarks=bookmarks,
+        source_files=data.get("source_files", []),
         created_at=datetime.fromisoformat(data["created_at"]),
         updated_at=datetime.fromisoformat(data["updated_at"]),
     )

@@ -25,6 +25,7 @@ class SessionActionType(StrEnum):
 
     LOAD = "load"
     SAVE = "save"
+    RENAME = "rename"
 
 
 @dataclass
@@ -80,6 +81,7 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
 
     def __init__(self, current_session: str | None = None) -> None:
         super().__init__()
+        self._original_session = current_session
         self._current_session = current_session
         self._renaming: str | None = None
 
@@ -152,8 +154,11 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
             return
 
         if self._renaming:
-            rename_session(self._renaming, new_name)
-            self.notify(f"Renamed '{self._renaming}' to '{new_name}'")
+            old_name = self._renaming
+            rename_session(old_name, new_name)
+            self.notify(f"Renamed '{old_name}' to '{new_name}'")
+            if old_name == self._current_session:
+                self._current_session = new_name
             self._renaming = None
             inp = self.query_one("#save-input", Input)
             inp.value = ""
@@ -170,5 +175,7 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
             inp.value = ""
             inp.placeholder = "Save as new session name..."
             self.query_one("#session-list", OptionList).focus()
+        elif self._current_session != self._original_session:
+            self.dismiss(SessionAction(SessionActionType.RENAME, self._current_session or ""))
         else:
             self.dismiss(None)

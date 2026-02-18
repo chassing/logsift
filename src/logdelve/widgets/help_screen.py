@@ -21,6 +21,15 @@ HELP_TEXT = """\
   G                                     Jump to last line
   :                                     Go to line number
   @                                     Jump to timestamp
+  [                                     Previous bookmark
+  ]                                     Next bookmark
+
+[bold]Bookmarks[/bold]
+  b                                     Toggle bookmark on current line
+  B                                     List bookmarks
+  A                                     Add/edit annotation
+  \\[                                     Previous bookmark
+  ]                                     Next bookmark
 
 [bold]Search[/bold]
   /                                     Search forward

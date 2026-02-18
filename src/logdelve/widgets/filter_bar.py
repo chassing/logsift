@@ -35,6 +35,12 @@ class FilterBar(Widget):
         self._anomaly_count: int = 0
         self._anomaly_filter_active: bool = False
         self._search_text: str | None = None
+        self._bookmark_count: int = 0
+
+    def set_bookmark_count(self, count: int) -> None:
+        """Update bookmark count display."""
+        self._bookmark_count = count
+        self.refresh()
 
     def update_filters(self, rules: list[FilterRule]) -> None:
         """Update the displayed filters."""
@@ -59,66 +65,50 @@ class FilterBar(Widget):
 
     def render(self) -> Text:
         text = Text()
+        s = "  "
 
-        # Base shortcuts
-        text.append(" f", style="bold")
-        text.append(" filter-in", style="dim")
-        text.append("  F", style="bold")
-        text.append(" filter-out", style="dim")
-        # x toggle all filters
-        text.append("  x", style="bold")
-        text.append(" filters off", style="dim")
-
-        text.append("  │", style="dim")
-        text.append("  a", style="bold")
-        text.append(" analyze", style="dim")
-
-        # Search: show active search or shortcut
-        text.append("  │", style="dim")
-        text.append("  /", style="bold")
+        # Search
         if self._search_text:
-            display = (
-                self._search_text[:_MAX_SEARCH_DISPLAY_LEN] + "…"
-                if len(self._search_text) > _MAX_SEARCH_DISPLAY_LEN
-                else self._search_text
-            )
-            text.append(f" {display}", style="bold cyan")
-            text.append("  n", style="bold")
-            text.append("/", style="dim")
-            text.append("N", style="bold")
-            text.append(" next/prev", style="dim")
+            display = self._search_text[:_MAX_SEARCH_DISPLAY_LEN] + ("…" if len(self._search_text) > _MAX_SEARCH_DISPLAY_LEN else "")
+            text.append(f" /? 🔍 {display}", style="bold cyan")
+            text.append(f"{s}n/N ↕", style="dim")
         else:
-            text.append(" search", style="dim")
+            text.append(" /? 🔍", style="dim")
 
-        # Level filter (show when levels detected)
-        if self._has_levels:
-            text.append("  │  ", style="dim")
-            text.append("e", style="bold")
-            if self._min_level is not None:
-                text.append(f" ≥{self._min_level.value.upper()}", style="bold yellow")
-            else:
-                text.append(" level-filter", style="dim")
-
-        # Anomaly info
-        if self._anomaly_count > 0:
-            text.append("  │  ", style="dim")
-            text.append("!", style="bold")
-            if self._anomaly_filter_active:
-                text.append(f" {self._anomaly_count} anomalies", style="bold red")
-            else:
-                text.append(f" {self._anomaly_count} anomalies", style="dim")
-
-        # Active filters
+        # Filters
         if self.filters:
-            text.append("  │  ", style="dim")
             total = len(self.filters)
             active = sum(1 for r in self.filters if r.enabled)
-            text.append(f"{total} filters", style="bold")
-            if active < total:
-                text.append(f" ({active})", style="dim")
-            text.append("  m", style="bold")
-            text.append(" manage", style="dim")
-            text.append("  1-9", style="bold")
-            text.append(" toggle", style="dim")
+            label = f"{active}/{total}" if active < total else str(total)
+            text.append(f"{s}f/F ⊞ {label}", style="bold")
+            text.append(f"{s}m 📋", style="dim")
+        else:
+            text.append(f"{s}f/F ⊞", style="dim")
+
+        # Level
+        if self._has_levels:
+            if self._min_level is not None:
+                text.append(f"{s}e ≥{self._min_level.value.upper()}", style="bold yellow")
+            else:
+                text.append(f"{s}e ≥", style="dim")
+
+        # Anomalies
+        if self._anomaly_count > 0:
+            style = "bold red" if self._anomaly_filter_active else "dim"
+            text.append(f"{s}! ⚠ {self._anomaly_count}", style=style)
+
+        # Bookmarks
+        if self._bookmark_count > 0:
+            text.append(f"{s}b/B 📌 {self._bookmark_count}", style="bold")
+            text.append(f"{s}A ✏", style="dim")
+        else:
+            text.append(f"{s}b/B 📌", style="dim")
+
+        # Right-aligned shortcuts
+        shortcuts = " @ ⏱  : 📍  r 🔗  a 📊  h ❓"
+        used = len(text.plain)
+        padding = max(1, self.size.width - used - len(shortcuts))
+        text.append(" " * padding)
+        text.append(shortcuts, style="dim")
 
         return text
