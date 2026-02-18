@@ -238,6 +238,14 @@ gh release create vX.Y.Z --title "vX.Y.Z" --notes "See CHANGELOG.md"
 
 The `publish.yml` workflow builds and publishes to PyPI automatically. Requires `PYPI_TOKEN` secret in the GitHub repo settings.
 
+## Alternatives
+
+- **[lnav](https://lnav.org/)** — Feature-rich log file navigator with SQL queries, automatic format detection, and timeline view. C++-based.
+- **[tailspin](https://github.com/bensadeh/tailspin)** — Log file highlighter with automatic pattern detection. Focused on making logs readable, no filtering or analysis.
+- **[GoAccess](https://goaccess.io/)** — Real-time web log analyzer with terminal and HTML dashboards. Specialized for access logs (Apache, Nginx), not general-purpose.
+- **[Textualog](https://github.com/rhuygen/textualog)** — Textual-based log viewer. Minimal feature set, no filtering or anomaly detection.
+- **[jq](https://jqlang.github.io/jq/)** — JSON processor. Powerful for one-off queries but no TUI, no live tailing, no session management.
+
 ## License
 
 MIT
