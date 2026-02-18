@@ -455,6 +455,12 @@ Press `e` to cycle: ALL → ERROR → WARN → INFO → ALL. This filters by the
 
 Press `!` to toggle showing only anomalous lines (requires `--baseline`). See [Anomaly Detection](#anomaly-detection).
 
+### Trace ID correlation
+
+Press `r` on a JSON log line to filter by its trace/request ID. logdelve auto-detects common ID fields (`trace_id`, `request_id`, `correlation_id`, `span_id` and their camelCase variants) and creates an include filter for the first match. This is a shortcut for manually creating a JSON key filter via `f`.
+
+If the current line is not JSON or has no recognized ID field, a notification is shown.
+
 ### Suspend / Resume
 
 Press `x` to suspend ALL active filters (rules, level, anomaly) at once. Press `x` again to restore them exactly as they were.
@@ -880,6 +886,7 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 | `e`     | Cycle log level filter                 |
 | `!`     | Toggle anomaly filter                  |
 | `x`     | Suspend / resume all filters           |
+| `r`     | Show related (trace/request ID)        |
 | `m`     | Manage filters                         |
 | `1`-`9` | Toggle individual filter               |
 

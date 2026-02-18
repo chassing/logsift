@@ -44,6 +44,7 @@ HELP_TEXT = """\
   x                                     Suspend/resume all filters
   e                                     Cycle log level filter (ALL → ERROR → WARN → INFO)
   !                                     Toggle anomaly-only filter (with --baseline)
+  r                                     Show related (trace/request ID correlation)
   1-9                                   Toggle individual filter on/off
 
   a                                     Analyze message groups

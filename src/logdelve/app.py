@@ -33,6 +33,13 @@ if TYPE_CHECKING:
 
     from logdelve.parsers import LogParser
 _ANALYZE_LINE_THRESHOLD = 10_000
+_TRACE_ID_KEYS = (
+    "trace_id", "traceId", "traceID",
+    "request_id", "requestId", "requestID",
+    "correlation_id", "correlationId", "correlationID",
+    "span_id", "spanId",
+    "x-request-id",
+)
 
 
 class LogDelveApp(App[None]):  # noqa: PLR0904
@@ -50,6 +57,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         Binding("at", "jump_to_time", "Jump to time", show=False),
         Binding("f", "filter_in", "Filter in", show=False),
         Binding("F", "filter_out", "Filter out", show=False),
+        Binding("r", "show_related", "Related", show=False),
         Binding("a", "analyze", "Analyze", show=False),
         Binding("m", "manage_filters", "Filters", show=False),
         Binding("t", "toggle_theme", "Theme", show=False),
@@ -509,6 +517,36 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             self.notify("All filters suspended")
 
         self._update_status_bar()
+
+    # --- Trace correlation ---
+
+    def action_show_related(self) -> None:
+        """Filter to lines sharing the same trace/request ID as the current line."""
+        log_view = self.query_one("#log-view", LogView)
+        visible = log_view.lines
+        if not visible:
+            return
+        line = visible[log_view.cursor_line]
+        if line.content_type != ContentType.JSON or line.parsed_json is None:
+            self.notify("No JSON data on current line", severity="warning")
+            return
+
+        # Find first matching trace ID key
+        for key in _TRACE_ID_KEYS:
+            value = line.parsed_json.get(key)
+            if value is not None and isinstance(value, str) and value:
+                rule = FilterRule(
+                    filter_type=FilterType.INCLUDE,
+                    pattern=f"{key}={value}",
+                    is_json_key=True,
+                    json_key=key,
+                    json_value=value,
+                )
+                self._add_filter(rule)
+                self.notify(f"Trace: {key}={value[:32]}...")
+                return
+
+        self.notify("No trace/request ID found", severity="warning")
 
     # --- Session actions ---
 
