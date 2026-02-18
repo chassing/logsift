@@ -686,6 +686,11 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
                     json_value=value,
                 )
                 self._add_filter(rule)
+                # Reset level filter so the full request lifecycle is visible
+                if self._min_level is not None:
+                    self._min_level = None
+                    log_view.set_min_level(None)
+                    self._update_status_bar()
                 self.notify(f"Trace: {key}={value[:32]}...")
                 return
 

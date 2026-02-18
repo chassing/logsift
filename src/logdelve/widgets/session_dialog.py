@@ -75,6 +75,7 @@ class SessionManageDialog(ModalScreen[SessionAction | None]):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "cancel", "Close"),
+        Binding("q", "cancel", "Close"),
         Binding("d", "delete_session", "Delete"),
         Binding("r", "rename_session", "Rename"),
     ]

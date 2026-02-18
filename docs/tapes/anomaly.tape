@@ -1,5 +1,5 @@
 # Hero 2: Anomaly detection with baseline comparison
-Output docs/screenshots/hero-anomaly.gif
+Output docs/screenshots/anomaly.gif
 
 Require logdelve
 
@@ -25,7 +25,7 @@ Enter
 Show
 
 # Start with baseline comparison
-Type "uv run logdelve inspect --baseline /tmp/baseline.log --no-tail /tmp/current.log"
+Type "uv run logdelve inspect --baseline /tmp/baseline.log /tmp/current.log"
 Enter
 Sleep 3s
 

@@ -18,7 +18,7 @@ Type "clear"
 Enter
 Show
 
-Type "uv run logdelve inspect --no-tail /tmp/demo.log"
+Type "uv run logdelve inspect /tmp/demo.log"
 Enter
 Sleep 2s
 

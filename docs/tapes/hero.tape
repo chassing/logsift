@@ -23,7 +23,7 @@ Enter
 Show
 
 # Start app
-Type "uv run logdelve inspect --no-tail /tmp/demo.log"
+Type "uv run logdelve inspect /tmp/demo.log"
 Enter
 Sleep 1s
 

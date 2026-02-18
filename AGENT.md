@@ -281,6 +281,7 @@ These files must stay in sync when keybindings or features change:
 
 ### General
 
+- Always write all code, comments, documentation, commit messages, and VHS tape descriptions in English.
 - NO arbitrary dictionaries. Always use pydantic models for structured data.
 - Use type hints everywhere. mypy strict mode must pass.
 - Keep functions focused — one clear purpose per function.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,12 @@ from logdelve.models import AppConfig
 
 
 def get_config_dir() -> Path:
-    """Get the logdelve config directory."""
+    """Get the logdelve config directory.
+
+    Respects LOGDELVE_CONFIG_DIR environment variable if set.
+    """
+    if override := os.environ.get("LOGDELVE_CONFIG_DIR"):
+        return Path(override)
     return Path(user_config_dir("logdelve"))
 
 
