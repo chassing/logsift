@@ -109,7 +109,9 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         text.append(f"{status} ", style=status_style)
 
         prefix = "+" if rule.filter_type == FilterType.INCLUDE else "-"
-        if rule.is_component:
+        if rule.is_time_range:
+            label = rule.pattern
+        elif rule.is_component:
             label = f"component:{rule.component_name}"
         elif rule.is_json_key:
             label = f"{rule.json_key}={rule.json_value}"
@@ -145,8 +147,8 @@ class FilterManageDialog(ModalScreen[list[FilterRule] | None]):
         if idx is None or idx >= len(self._filters):
             return
         rule = self._filters[idx]
-        if rule.is_json_key or rule.is_component:
-            return  # JSON key and component filters can't be edited as text
+        if rule.is_json_key or rule.is_component or rule.is_time_range:
+            return  # JSON key, component, and time range filters can't be edited as text
         self._editing_idx = idx
         inp = self.query_one("#edit-input", Input)
         inp.value = rule.pattern

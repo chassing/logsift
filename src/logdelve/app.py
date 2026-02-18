@@ -86,6 +86,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         file_paths: list[Path] | None = None,
         file_parsers: list[LogParser] | None = None,
         file_initial_counts: list[int] | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> None:
         super().__init__()
         self._lines = lines or []
@@ -110,6 +112,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self.theme = self._config.theme
         self._file_size = file_size
         self._loading_complete: bool = file_size is None and file_paths is None
+        self._cli_start_time = start_time
+        self._cli_end_time = end_time
         self._file_paths = file_paths
         self._file_parsers = file_parsers
         self._file_initial_counts = file_initial_counts
@@ -124,7 +128,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         yield StatusBar(source=self._source, id="status-bar")
         yield Footer()
 
-    def on_mount(self) -> None:
+    def on_mount(self) -> None:  # noqa: C901
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
 
@@ -144,6 +148,30 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
                 self.notify(f"Session '{self._session_name}' loaded")
             except FileNotFoundError:
                 pass
+
+        # CLI time range filter — resolve to absolute timestamps using log file's reference date
+        if self._cli_start_time or self._cli_end_time:
+            from logdelve.utils import parse_time  # noqa: PLC0415
+
+            ref_date = self._get_reference_date()
+            pattern_parts = []
+            start_iso: str | None = None
+            end_iso: str | None = None
+            if self._cli_start_time:
+                start_iso = parse_time(self._cli_start_time, reference_date=ref_date).isoformat()
+                pattern_parts.append(f"after {self._cli_start_time}")
+            if self._cli_end_time:
+                end_iso = parse_time(self._cli_end_time, reference_date=ref_date).isoformat()
+                pattern_parts.append(f"before {self._cli_end_time}")
+            time_rule = FilterRule(
+                filter_type=FilterType.INCLUDE,
+                pattern=f"Time: {' '.join(pattern_parts)}",
+                is_time_range=True,
+                time_start=start_iso,
+                time_end=end_iso,
+            )
+            self._filter_rules.append(time_rule)
+            self._apply_filters()
 
         # Baseline anomaly detection (only when all lines are loaded)
         if self._baseline_path and self._lines and self._loading_complete:
@@ -403,16 +431,18 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     def action_filter_in(self) -> None:
         json_data = self._get_current_json_data()
         components = self.query_one("#log-view", LogView).get_all_components()
+        ref_date = self._get_reference_date()
         self.push_screen(
-            FilterDialog(FilterType.INCLUDE, json_data=json_data, components=components),
+            FilterDialog(FilterType.INCLUDE, json_data=json_data, components=components, reference_date=ref_date),
             callback=self._on_filter_result,
         )
 
     def action_filter_out(self) -> None:
         json_data = self._get_current_json_data()
         components = self.query_one("#log-view", LogView).get_all_components()
+        ref_date = self._get_reference_date()
         self.push_screen(
-            FilterDialog(FilterType.EXCLUDE, json_data=json_data, components=components),
+            FilterDialog(FilterType.EXCLUDE, json_data=json_data, components=components, reference_date=ref_date),
             callback=self._on_filter_result,
         )
 

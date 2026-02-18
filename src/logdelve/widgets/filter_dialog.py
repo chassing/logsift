@@ -11,12 +11,15 @@ from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label, SelectionList, TabbedContent, TabPane
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from textual.app import ComposeResult
     from textual.binding import BindingType
     from textual.events import Key
 
 from logdelve.filters import flatten_json
 from logdelve.models import FilterRule, FilterType
+from logdelve.widgets.timestamp_input import TimestampInput
 
 
 class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
@@ -119,6 +122,7 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
         filter_type: FilterType,
         json_data: dict[str, Any] | None = None,
         components: dict[str, int] | None = None,
+        reference_date: datetime | None = None,
     ) -> None:
         super().__init__()
         self._filter_type = filter_type
@@ -126,6 +130,7 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
         self._pairs: list[tuple[str, str]] = []
         self._components = components or {}
         self._component_names: list[str] = []
+        self._reference_date = reference_date
 
     def compose(self) -> ComposeResult:
         label = "Filter in (show matching)" if self._filter_type == FilterType.INCLUDE else "Filter out (hide matching)"
@@ -138,6 +143,8 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
                 if self._components:
                     with TabPane("Component", id="tab-component"):
                         yield from self._compose_component_tab()
+                with TabPane("Time", id="tab-time"):
+                    yield from self._compose_time_tab()
 
             yield Label("Space to toggle, Enter to apply, Escape to cancel", classes="hint")
 
@@ -164,6 +171,12 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
             count = self._components[name]
             selections.append((f"{name}  ({count:,} lines)", name))
         yield SelectionList[str](*selections, id="component-list")
+
+    def _compose_time_tab(self) -> ComposeResult:
+        yield Label("Start (inclusive):", classes="hint")
+        yield TimestampInput(id="time-start", reference_date=self._reference_date)
+        yield Label("End (exclusive):", classes="hint")
+        yield TimestampInput(id="time-end", reference_date=self._reference_date)
 
     def on_mount(self) -> None:
         self._focus_active_tab_content()
@@ -202,11 +215,15 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
                         child.highlighted = 0
                     return
 
-    def on_tabbed_content_tab_activated(self, _event: TabbedContent.TabActivated) -> None:
-        """When a tab is activated, focus its content."""
-        self._focus_active_tab_content()
-
     def on_input_submitted(self, _event: Input.Submitted) -> None:
+        try:
+            tabs = self.query_one("#filter-tabs", TabbedContent)
+            active = tabs.active_pane
+            if active is not None and active.id == "tab-time":
+                self._submit_time_range()
+                return
+        except NoMatches:
+            pass
         self._submit_text_filter()
 
     def _submit_text_filter(self) -> None:
@@ -302,6 +319,56 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
             for name in selected
         ]
         self.dismiss(rules)
+
+    def _submit_time_range(self) -> None:
+        """Submit a time range filter from start/end TimestampInput widgets."""
+        try:
+            start_widget = self.query_one("#time-start", TimestampInput)
+            end_widget = self.query_one("#time-end", TimestampInput)
+        except NoMatches:
+            self.dismiss(None)
+            return
+
+        start_raw = start_widget.value
+        end_raw = end_widget.value
+
+        if not start_raw and not end_raw:
+            self.dismiss(None)
+            return
+
+        # Parse and resolve to absolute timestamps
+        start_iso: str | None = None
+        end_iso: str | None = None
+
+        if start_raw:
+            start_result = start_widget.parse()
+            if start_result is None:
+                return
+            start_iso = start_result.isoformat()
+
+        if end_raw:
+            end_result = end_widget.parse()
+            if end_result is None:
+                return
+            end_iso = end_result.isoformat()
+
+        # Build display pattern (show user's input, not ISO)
+        if start_raw and end_raw:
+            pattern = f"Time: {start_raw} - {end_raw}"
+        elif start_raw:
+            pattern = f"Time: after {start_raw}"
+        else:
+            pattern = f"Time: before {end_raw}"
+
+        self.dismiss(
+            FilterRule(
+                filter_type=self._filter_type,
+                pattern=pattern,
+                is_time_range=True,
+                time_start=start_iso,
+                time_end=end_iso,
+            )
+        )
 
     def action_cancel(self) -> None:
         self.dismiss(None)

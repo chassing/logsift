@@ -67,6 +67,9 @@ class FilterRule(BaseModel):
     json_value: str | None = None
     is_component: bool = False
     component_name: str | None = None
+    is_time_range: bool = False
+    time_start: str | None = None
+    time_end: str | None = None
 
 
 class SearchDirection(StrEnum):

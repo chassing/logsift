@@ -431,6 +431,14 @@ The filter dialog uses a **tabbed interface**:
 - Multi-select: toggle components with Space, apply with Enter
 - Each selected component creates a separate filter rule
 
+**Time tab**:
+
+- Start (inclusive) and End (exclusive) timestamp inputs
+- Supports all timestamp formats: `14:30`, ISO 8601, `5m`, natural language
+- Time-only values use the log file's date (not today)
+- Partial ranges: start-only or end-only supported
+- CLI: `--start/-S` and `--end/-E` for time range on startup
+
 Use Tab/Shift-Tab to switch between tabs. Space toggles selections, Enter applies.
 
 ### Filter logic

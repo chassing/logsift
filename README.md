@@ -72,6 +72,9 @@ kubectl logs deploy/my-app --since=1h | logdelve inspect
 # Download and view CloudWatch logs
 logdelve cloudwatch get /aws/ecs/my-service prefix -s 1h | logdelve inspect
 
+# Filter by time range
+logdelve inspect --start "14:30" --end "14:35" app.log
+
 # Compare against a known-good baseline
 logdelve inspect --baseline yesterday.log today.log
 ```

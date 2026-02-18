@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from logdelve.models import FilterRule, FilterType, LogLine
+from logdelve.utils import parse_time
+
+# Cache for parsed time range boundaries to avoid re-parsing per line
+_time_range_cache: dict[str, datetime] = {}
 
 
 def apply_filters(lines: list[LogLine], rules: list[FilterRule]) -> list[int]:
@@ -50,6 +57,8 @@ def check_line(line: LogLine, rules: list[FilterRule]) -> bool:
 
 def _matches(line: LogLine, rule: FilterRule) -> bool:
     """Check if a line matches a filter rule."""
+    if rule.is_time_range:
+        return _matches_time_range(line, rule)
     if rule.is_component:
         return _matches_component(line, rule)
     if rule.is_json_key:
@@ -59,6 +68,36 @@ def _matches(line: LogLine, rule: FilterRule) -> bool:
     if rule.case_sensitive:
         return rule.pattern in line.raw
     return rule.pattern.lower() in line.raw.lower()
+
+
+def _parse_time_cached(value: str) -> datetime | None:
+    """Parse a time string with caching to avoid re-parsing per line."""
+    if value in _time_range_cache:
+        return _time_range_cache[value]
+    try:
+        result = parse_time(value)
+        _time_range_cache[value] = result
+        return result
+    except ValueError:
+        return None
+
+
+def _matches_time_range(line: LogLine, rule: FilterRule) -> bool:
+    """Check if a line's timestamp falls within a time range filter."""
+    if line.timestamp is None:
+        return False
+
+    if rule.time_start is not None:
+        start = _parse_time_cached(rule.time_start)
+        if start is not None and line.timestamp < start:
+            return False
+
+    if rule.time_end is not None:
+        end = _parse_time_cached(rule.time_end)
+        if end is not None and line.timestamp >= end:
+            return False
+
+    return True
 
 
 def _matches_component(line: LogLine, rule: FilterRule) -> bool:

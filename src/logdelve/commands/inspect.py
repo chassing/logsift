@@ -71,6 +71,8 @@ def _run_multi_file(
     parser: ParserName,
     session: str | None,
     baseline: Path | None,
+    start: str | None = None,
+    end: str | None = None,
 ) -> None:
     """Handle multi-file mode: read, tag, merge, and launch TUI."""
     all_lines: list[LogLine] = []
@@ -97,6 +99,8 @@ def _run_multi_file(
         file_paths=files,
         file_parsers=file_parsers,
         file_initial_counts=file_initial_counts,
+        start_time=start,
+        end_time=end,
     )
     log_app.run(mouse=False)
 
@@ -111,6 +115,8 @@ def inspect(  # noqa: C901
     parser: Annotated[
         ParserName, typer.Option("--parser", "-p", help="Log format parser (default: auto-detect)")
     ] = ParserName.AUTO,
+    start: Annotated[str | None, typer.Option("--start", "-S", help="Start of time range filter (inclusive)")] = None,
+    end: Annotated[str | None, typer.Option("--end", "-E", help="End of time range filter (exclusive)")] = None,
 ) -> None:
     """View and filter log lines in a terminal UI."""
     if files:
@@ -129,7 +135,7 @@ def inspect(  # noqa: C901
 
     # Multi-file mode
     if files and len(files) > 1:
-        _run_multi_file(files, parser, session, baseline)
+        _run_multi_file(files, parser, session, baseline, start=start, end=end)
         return
 
     # Single-file or pipe mode
@@ -170,5 +176,7 @@ def inspect(  # noqa: C901
         baseline_path=baseline,
         parser=log_parser,
         file_size=file_size,
+        start_time=start,
+        end_time=end,
     )
     log_app.run(mouse=False)

@@ -96,6 +96,7 @@ def _filter_to_dict(rule: FilterRule) -> dict[str, Any]:
         "case_sensitive": rule.case_sensitive,
         "is_json_key": rule.is_json_key,
         "is_component": rule.is_component,
+        "is_time_range": rule.is_time_range,
     }
     if rule.json_key is not None:
         d["json_key"] = rule.json_key
@@ -103,6 +104,10 @@ def _filter_to_dict(rule: FilterRule) -> dict[str, Any]:
         d["json_value"] = rule.json_value
     if rule.component_name is not None:
         d["component_name"] = rule.component_name
+    if rule.time_start is not None:
+        d["time_start"] = rule.time_start
+    if rule.time_end is not None:
+        d["time_end"] = rule.time_end
     return d
 
 
@@ -118,4 +123,7 @@ def _dict_to_filter(d: dict[str, Any]) -> FilterRule:
         json_value=d.get("json_value"),
         is_component=d.get("is_component", False),
         component_name=d.get("component_name"),
+        is_time_range=d.get("is_time_range", False),
+        time_start=d.get("time_start"),
+        time_end=d.get("time_end"),
     )

@@ -38,8 +38,8 @@ HELP_TEXT = """\
   c                                     Cycle component display (tag → full → off)
 
 [bold]Filtering[/bold]
-  f                                     Filter in (text, key=value, regex, or component)
-  F                                     Filter out (text, key=value, regex, or component)
+  f                                     Filter in (text, key=value, regex, component, or time)
+  F                                     Filter out (text, key=value, regex, component, or time)
   m                                     Manage filters (toggle, edit, delete, clear, reorder)
   x                                     Suspend/resume all filters
   e                                     Cycle log level filter (ALL → ERROR → WARN → INFO)
@@ -50,7 +50,9 @@ HELP_TEXT = """\
 
   On JSON lines, f and F show key-value suggestions.
   When components are detected, a Component tab allows filtering by component.
+  Time tab allows filtering by timestamp range (start/end).
   Filters are auto-saved as sessions.
+  CLI: --start/-S and --end/-E for time range on startup.
 
 [bold]Tailing[/bold]
   p                                     Pause/resume tailing
