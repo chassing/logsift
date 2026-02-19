@@ -19,8 +19,10 @@ if TYPE_CHECKING:
 
 from logdelve.colors import _SEARCH_COLORS
 from logdelve.models import (
+    _MAX_HISTORY,
     _MAX_SEARCH_PATTERNS,
     SearchDirection,
+    SearchHistoryEntry,
     SearchPattern,
     SearchPatternSet,
     SearchQuery,
@@ -107,6 +109,15 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         max-height: 12;
         margin-top: 1;
     }
+
+    NavigationDialog #history-list {
+        height: auto;
+        max-height: 7;
+        margin-top: 0;
+        border: round $accent-lighten-1;
+        background: $surface-lighten-1;
+        display: none;
+    }
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -122,6 +133,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         bookmarks: dict[int, str] | None = None,
         all_lines: list[Any] | None = None,
         nav_current_pattern: int = -1,
+        search_history: list[SearchHistoryEntry] | None = None,
     ) -> None:
         super().__init__()
         self._direction = direction
@@ -130,6 +142,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         self._bookmarks = bookmarks or {}
         self._all_lines = all_lines or []
         self._bookmark_indices: list[int] = sorted(self._bookmarks.keys())
+        self._search_history = search_history
 
         # Working copy of patterns for dialog manipulation
         self._working_patterns: list[SearchPattern] = list(search_patterns.patterns) if search_patterns else []
@@ -163,13 +176,13 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                     yield from self._compose_bookmarks_tab()
 
             yield Label(
-                "Enter: add/update | Del: remove | Space: highlight | >: n/N target | Esc: apply",
+                "Enter: add/update | Del: remove | Ctrl+D: clear all | Space: highlight | >: n/N target | Esc: apply",
                 classes="hint",
             )
 
-    @staticmethod
-    def _compose_search_tab() -> ComposeResult:
+    def _compose_search_tab(self) -> ComposeResult:  # noqa: PLR6301
         yield Input(placeholder="search pattern...", id="search-input")
+        yield OptionList(id="history-list")
         with Horizontal():
             yield Checkbox("Case sensitive", id="case-sensitive")
             yield Checkbox("Regex", id="regex")
@@ -198,6 +211,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
     def on_mount(self) -> None:
         self._rebuild_pattern_list()
+        self._rebuild_history_list()
+        self._update_history_visibility()
         self._focus_active_tab_content()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -270,6 +285,64 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         if highlighted is not None and self._working_patterns:
             ol.highlighted = min(highlighted, len(self._working_patterns) - 1)
 
+    # --- History dropdown ---
+
+    def _rebuild_history_list(self) -> None:
+        """Rebuild the history OptionList from self._search_history."""
+        try:
+            ol = self.query_one("#history-list", OptionList)
+        except NoMatches:
+            return
+
+        ol.clear_options()
+        if not self._search_history:
+            return
+        for entry in self._search_history:
+            text = Text()
+            text.append(f" {entry.pattern} ", style="bold")
+            if entry.case_sensitive:
+                text.append(" Aa", style="dim")
+            if entry.is_regex:
+                text.append(" .*", style="dim")
+            ol.add_option(Option(text))
+
+    def _update_history_visibility(self) -> None:
+        """Show history dropdown if input is empty and history is non-empty."""
+        try:
+            inp = self.query_one("#search-input", Input)
+            history_list = self.query_one("#history-list", OptionList)
+        except NoMatches:
+            return
+        if not inp.value and self._search_history:
+            history_list.display = True
+        else:
+            history_list.display = False
+
+    def _show_history(self) -> None:
+        """Show the history dropdown."""
+        try:
+            history_list = self.query_one("#history-list", OptionList)
+        except NoMatches:
+            return
+        if self._search_history:
+            history_list.display = True
+
+    def _hide_history(self) -> None:
+        """Hide the history dropdown."""
+        import contextlib  # noqa: PLC0415
+
+        with contextlib.suppress(NoMatches):
+            self.query_one("#history-list", OptionList).display = False
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Show/hide history dropdown based on input content."""
+        if event.input.id != "search-input":
+            return
+        if event.value:
+            self._hide_history()
+        else:
+            self._show_history()
+
     # --- Key handling ---
 
     def _is_search_tab_active(self) -> bool:
@@ -307,16 +380,46 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             if isinstance(widget, OptionList) and widget.highlighted is None and widget.option_count > 0:
                 widget.highlighted = 0
 
-    def _handle_search_tab_key(self, event: Key, focused: object) -> None:
+    def _handle_search_tab_key(self, event: Key, focused: object) -> None:  # noqa: C901, PLR0911, PLR0912
         """Handle key events specific to the Search tab."""
         is_pattern_list = isinstance(focused, OptionList) and focused.id == "pattern-list"
+        is_history_list = isinstance(focused, OptionList) and focused.id == "history-list"
         is_checkbox = isinstance(focused, Checkbox) and focused.id in {"case-sensitive", "regex"}
+        is_input = isinstance(focused, Input) and focused.id == "search-input"
+
+        # Ctrl+D: clear all patterns (works from any focused widget)
+        if event.key == "ctrl+d":
+            event.prevent_default()
+            event.stop()
+            self._clear_all_patterns()
+            return
 
         if event.key in {"tab", "shift+tab"}:
             event.prevent_default()
             event.stop()
+            # If history list is focused, go back to input on Tab
+            if is_history_list:
+                import contextlib  # noqa: PLC0415
+
+                with contextlib.suppress(NoMatches):
+                    self.query_one("#search-input", Input).focus()
+                return
             self._cycle_focus(forward=event.key == "tab")
             return
+
+        # Down arrow from input into history dropdown (if visible)
+        if event.key == "down" and is_input:
+            try:
+                history_list = self.query_one("#history-list", OptionList)
+            except NoMatches:
+                return
+            if history_list.display and history_list.option_count > 0:
+                event.prevent_default()
+                event.stop()
+                history_list.focus()
+                if history_list.highlighted is None:
+                    history_list.highlighted = 0
+                return
 
         # Delete/Backspace on OptionList: remove highlighted pattern
         if event.key in {"delete", "backspace"} and is_pattern_list:
@@ -351,6 +454,21 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                 self._set_nav_target(index)
 
     # --- Pattern management ---
+
+    def _clear_all_patterns(self) -> None:
+        """Clear all working patterns."""
+        self._working_patterns.clear()
+        self._nav_target_index = 0
+        self._next_color = 0
+        self._editing_index = None
+        try:
+            inp = self.query_one("#search-input", Input)
+            inp.value = ""
+            self.query_one("#case-sensitive", Checkbox).value = False
+            self.query_one("#regex", Checkbox).value = False
+        except NoMatches:
+            pass
+        self._rebuild_pattern_list()
 
     def _set_nav_target(self, index: int) -> None:
         """Set the n/N navigation target to the given pattern index and update display."""
@@ -393,6 +511,28 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             direction=self._direction,
         )
 
+        # Record to history (only for new patterns, not edits)
+        if self._editing_index is None and self._search_history is not None:
+            entry = SearchHistoryEntry(
+                pattern=pattern_text,
+                case_sensitive=case_sensitive,
+                is_regex=is_regex,
+            )
+            # Deduplicate: remove existing identical entry (same triple)
+            self._search_history[:] = [
+                h
+                for h in self._search_history
+                if not (
+                    h.pattern == entry.pattern
+                    and h.case_sensitive == entry.case_sensitive
+                    and h.is_regex == entry.is_regex
+                )
+            ]
+            # Insert at front (most recent first)
+            self._search_history.insert(0, entry)
+            # Trim to max size
+            del self._search_history[_MAX_HISTORY:]
+
         if self._editing_index is not None:
             # Update existing pattern at editing index
             idx = self._editing_index
@@ -430,6 +570,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         self.query_one("#case-sensitive", Checkbox).value = False
         self.query_one("#regex", Checkbox).value = False
         self._rebuild_pattern_list()
+        self._rebuild_history_list()
+        self._update_history_visibility()
 
     def _remove_highlighted_pattern(self) -> None:
         """Remove the highlighted pattern from the working list."""
@@ -444,9 +586,14 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
         self._working_patterns.pop(index)
 
-        # Adjust nav target index
+        # Adjust nav target index: move to previous pattern, wrapping if at beginning
         if self._nav_target_index == index:
-            self._nav_target_index = min(index, max(0, len(self._working_patterns) - 1))
+            if len(self._working_patterns) == 0:
+                self._nav_target_index = 0
+            elif index > 0:
+                self._nav_target_index = index - 1
+            else:
+                self._nav_target_index = len(self._working_patterns) - 1  # wrap
         elif self._nav_target_index > index:
             self._nav_target_index -= 1
 
@@ -514,11 +661,25 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             pass
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        """Handle selection: bookmark jumps, pattern-list focuses Input for editing."""
+        """Handle selection: bookmark jumps, pattern-list focuses Input for editing, history restores."""
         if event.option_list.id == "bookmark-list" and event.option_index < len(self._bookmark_indices):
             orig_idx = self._bookmark_indices[event.option_index]
             if orig_idx < len(self._all_lines):
                 self.dismiss(self._all_lines[orig_idx].line_number)
+        elif event.option_list.id == "history-list":
+            # Enter on history-list: populate input with selected history entry
+            if self._search_history and 0 <= event.option_index < len(self._search_history):
+                entry = self._search_history[event.option_index]
+                try:
+                    inp = self.query_one("#search-input", Input)
+                    inp.value = entry.pattern
+                    self.query_one("#case-sensitive", Checkbox).value = entry.case_sensitive
+                    self.query_one("#regex", Checkbox).value = entry.is_regex
+                    self._editing_index = None
+                    self._hide_history()
+                    inp.focus()
+                except NoMatches:
+                    pass
         elif event.option_list.id == "pattern-list":
             # Enter on pattern-list: focus Input for editing
             import contextlib  # noqa: PLC0415
@@ -611,6 +772,16 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
     def action_cancel(self) -> None:
         """Escape keeps changes - build pattern set from working patterns."""
+        # If history dropdown is visible and focused, hide it and refocus input
+        focused = self.focused
+        if isinstance(focused, OptionList) and focused.id == "history-list" and focused.display:
+            self._hide_history()
+            import contextlib  # noqa: PLC0415
+
+            with contextlib.suppress(NoMatches):
+                self.query_one("#search-input", Input).focus()
+            return
+
         # Check if on search tab - if so, add input text
         try:
             tabs = self.query_one("#nav-tabs", TabbedContent)
