@@ -36,6 +36,7 @@ class FilterBar(Widget):
         self._anomaly_count: int = 0
         self._anomaly_filter_active: bool = False
         self._search_patterns: SearchPatternSet | None = None
+        self._nav_current_pattern: int = -1
         self._bookmark_count: int = 0
 
     def set_bookmark_count(self, count: int) -> None:
@@ -59,9 +60,10 @@ class FilterBar(Widget):
         self._anomaly_filter_active = filter_active
         self.refresh()
 
-    def set_search_patterns(self, patterns: SearchPatternSet) -> None:
+    def set_search_patterns(self, patterns: SearchPatternSet, *, nav_current_pattern: int = -1) -> None:
         """Update active search patterns display."""
         self._search_patterns = patterns if patterns.active_count > 0 else None
+        self._nav_current_pattern = nav_current_pattern
         self.refresh()
 
     def render(self) -> Text:
@@ -120,7 +122,7 @@ class FilterBar(Widget):
         total_patterns = self._search_patterns.active_count
         for shown, pattern in enumerate(self._search_patterns.patterns):
             nav_icon = "\u25cf" if pattern.nav_enabled else "\u25cb"
-            chip_text = f" {nav_icon}{pattern.query.pattern} "
+            chip_text = f" {nav_icon} {pattern.query.pattern} "
             chip_width = len(chip_text)
             # Check if this chip fits, accounting for potential +N badge
             remaining = total_patterns - shown - 1
@@ -130,7 +132,9 @@ class FilterBar(Widget):
                 text.append(f" +{hidden} ", style="bold dim")
                 break
             bg_hex = _SEARCH_COLORS[pattern.color_index][0]
-            text.append(chip_text, style=Style(bgcolor=bg_hex, color="#ffffff"))
+            is_nav_target = shown == self._nav_current_pattern
+            chip_style = Style(bgcolor=bg_hex, color="#ffffff", bold=is_nav_target, underline=is_nav_target)
+            text.append(chip_text, style=chip_style)
             text.append(" ")
             used_width += chip_width + 1
         text.append(f"{s}n/N \u2195", style="dim")

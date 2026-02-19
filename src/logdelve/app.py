@@ -403,18 +403,26 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         """Update FilterBar and StatusBar with current multi-pattern search state."""
         log_view = self.query_one("#log-view", LogView)
         filter_bar = self.query_one("#filter-bar", FilterBar)
-        filter_bar.set_search_patterns(log_view.search_patterns)
+        filter_bar.set_search_patterns(
+            log_view.search_patterns,
+            nav_current_pattern=log_view.nav_current_pattern_index,
+        )
         self.update_search_status()
 
     def update_search_status(self) -> None:
-        """Update status bar with current search match info."""
+        """Update status bar and FilterBar with current search match info."""
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
+        filter_bar = self.query_one("#filter-bar", FilterBar)
         if log_view.has_search:
             pattern_counts = log_view.search_pattern_match_counts
             current = log_view.search_current_index + 1 if log_view.nav_match_count > 0 else 0
             total = log_view.nav_match_count
             status_bar.set_search_pattern_info(current, total, pattern_counts)
+            filter_bar.set_search_patterns(
+                log_view.search_patterns,
+                nav_current_pattern=log_view.nav_current_pattern_index,
+            )
         else:
             status_bar.clear_search_info()
 

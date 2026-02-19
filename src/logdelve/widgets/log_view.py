@@ -252,6 +252,13 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
     def search_current_index(self) -> int:
         return self._search_current
 
+    @property
+    def nav_current_pattern_index(self) -> int:
+        """Pattern index of the current nav match, or -1 if none."""
+        if 0 <= self._search_current < len(self._nav_matches):
+            return self._nav_matches[self._search_current][3]
+        return -1
+
     def on_mount(self) -> None:
         self._apply_filters()
 
@@ -506,9 +513,9 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         # Compute nav-filtered subset (only patterns with nav_enabled)
         nav_indices = {i for i, p in enumerate(self._search_patterns.patterns) if p.nav_enabled}
         self._nav_matches = [m for m in self._search_matches if m[3] in nav_indices]
-        # Group by line index for efficient rendering (all matches, not filtered)
+        # Group by line index for rendering — only nav-enabled patterns are highlighted
         self._search_matches_by_line = {}
-        for line_idx, start, end, pat_idx in self._search_matches:
+        for line_idx, start, end, pat_idx in self._nav_matches:
             self._search_matches_by_line.setdefault(line_idx, []).append((start, end, pat_idx))
 
     def _jump_to_nearest_match(self) -> None:
