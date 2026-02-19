@@ -138,7 +138,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         )
         self._editing_index: int | None = None
         # Which pattern is the current n/N navigation target (arrow indicator)
-        self._nav_target_index: int = nav_current_pattern
+        # Default to 0 (first pattern) if no explicit target was set
+        self._nav_target_index: int = max(nav_current_pattern, 0)
 
     def compose(self) -> ComposeResult:
         self._titles = {
@@ -162,7 +163,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                     yield from self._compose_bookmarks_tab()
 
             yield Label(
-                "Enter: add/update  Enter(empty): apply  Tab/S-Tab: navigate  Del: remove  Space: toggle nav",
+                "Enter: add/update | Del: remove | Space: toggle highlight | Escape: apply & close",
                 classes="hint",
             )
 
@@ -339,6 +340,26 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
     # --- Pattern management ---
 
+    def _set_nav_target(self, index: int) -> None:
+        """Set the n/N navigation target to the given pattern index and update display."""
+        old_target = self._nav_target_index
+        self._nav_target_index = index
+        # Update arrow indicators for old and new target
+        try:
+            ol = self.query_one("#pattern-list", OptionList)
+        except NoMatches:
+            return
+        if 0 <= old_target < len(self._working_patterns):
+            ol.replace_option_prompt_at_index(
+                old_target,
+                self._format_pattern(self._working_patterns[old_target]),
+            )
+        if 0 <= index < len(self._working_patterns):
+            ol.replace_option_prompt_at_index(
+                index,
+                self._format_pattern(self._working_patterns[index], is_nav_target=True),
+            )
+
     def _add_current_input_as_pattern(self) -> None:
         """Add the current input value as a new pattern or update the edited one."""
         try:
@@ -389,6 +410,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
             self._working_patterns.append(SearchPattern(query=query, color_index=color_index))
             self._next_color = (color_index + 1) % _MAX_SEARCH_PATTERNS
+            # New pattern becomes the n/N target
+            self._nav_target_index = len(self._working_patterns) - 1
 
         # Clear input and reset checkboxes
         inp.value = ""
@@ -408,6 +431,12 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             return
 
         self._working_patterns.pop(index)
+
+        # Adjust nav target index
+        if self._nav_target_index == index:
+            self._nav_target_index = min(index, max(0, len(self._working_patterns) - 1))
+        elif self._nav_target_index > index:
+            self._nav_target_index -= 1
 
         # Adjust editing index
         if self._editing_index == index:
@@ -479,7 +508,11 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             if orig_idx < len(self._all_lines):
                 self.dismiss(self._all_lines[orig_idx].line_number)
         elif event.option_list.id == "pattern-list":
-            # Enter on pattern-list: focus Input to edit the highlighted pattern
+            # Enter on pattern-list: set as n/N target + focus Input for editing
+            index = event.option_index
+            if 0 <= index < len(self._working_patterns):
+                self._set_nav_target(index)
+
             import contextlib  # noqa: PLC0415
 
             with contextlib.suppress(NoMatches):
@@ -503,6 +536,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         pattern_set = SearchPatternSet()
         pattern_set.patterns = list(self._working_patterns)
         pattern_set._next_color = self._next_color  # noqa: SLF001
+        # Clamp target index to valid range
+        pattern_set.nav_target_index = min(self._nav_target_index, len(self._working_patterns) - 1)
         return pattern_set
 
     def _add_input_if_present(self) -> None:

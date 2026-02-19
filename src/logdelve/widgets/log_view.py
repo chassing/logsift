@@ -147,9 +147,9 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         # Search state (multi-pattern)
         self._search_patterns: SearchPatternSet = SearchPatternSet()
         self._search_matches: list[tuple[int, int, int, int]] = []  # (line_idx, start, end, pattern_index)
-        self._nav_matches: list[tuple[int, int, int, int]] = []  # nav-enabled subset of _search_matches
+        self._nav_matches: list[tuple[int, int, int, int]] = []  # target-pattern subset for n/N navigation
         self._search_current: int = -1  # indexes into _nav_matches
-        # Pre-computed: matches grouped by visible line index for fast render lookup
+        # Pre-computed: matches grouped by visible line index for fast render lookup (all nav_enabled patterns)
         self._search_matches_by_line: dict[int, list[tuple[int, int, int]]] = {}  # (start, end, pattern_index)
         # Bookmarks: original line index → annotation text (empty = no annotation)
         self._bookmarks: dict[int, str] = {}
@@ -254,10 +254,10 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
     @property
     def nav_current_pattern_index(self) -> int:
-        """Pattern index of the current nav match, or -1 if none."""
-        if 0 <= self._search_current < len(self._nav_matches):
-            return self._nav_matches[self._search_current][3]
-        return -1
+        """Pattern index that n/N navigates, or -1 if no patterns."""
+        if self._search_patterns.is_empty:
+            return -1
+        return self._search_patterns.nav_target_index
 
     def on_mount(self) -> None:
         self._apply_filters()
@@ -476,6 +476,8 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         if result is None:
             self.app.notify("Maximum 10 search patterns", severity="warning")
             return
+        # New pattern becomes the n/N target
+        self._search_patterns.nav_target_index = len(self._search_patterns.patterns) - 1
         self._compute_search_matches()
         # Jump to first match from current cursor position
         if self._search_matches:
@@ -510,13 +512,15 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         visible = self.lines
         self._search_matches = find_all_pattern_matches(visible, self._search_patterns)
         self._search_current = -1
-        # Compute nav-filtered subset (only patterns with nav_enabled)
+        # Highlight matches: all nav_enabled patterns
         nav_indices = {i for i, p in enumerate(self._search_patterns.patterns) if p.nav_enabled}
-        self._nav_matches = [m for m in self._search_matches if m[3] in nav_indices]
-        # Group by line index for rendering — only nav-enabled patterns are highlighted
+        highlight_matches = [m for m in self._search_matches if m[3] in nav_indices]
         self._search_matches_by_line = {}
-        for line_idx, start, end, pat_idx in self._nav_matches:
+        for line_idx, start, end, pat_idx in highlight_matches:
             self._search_matches_by_line.setdefault(line_idx, []).append((start, end, pat_idx))
+        # Navigation matches: only the single target pattern (for n/N)
+        target = self._search_patterns.nav_target_index
+        self._nav_matches = [m for m in self._search_matches if m[3] == target]
 
     def _jump_to_nearest_match(self) -> None:
         """Jump to the nearest nav-enabled match from the current cursor position."""
@@ -550,10 +554,10 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             self.cursor_line = self._nav_matches[-1][0]
 
     def action_next_match(self) -> None:
-        """Go to the next nav-enabled search match."""
+        """Go to the next match of the target pattern."""
         if not self._nav_matches:
             if self._search_matches:
-                self.app.notify("No patterns enabled for navigation", severity="warning")
+                self.app.notify("No matches for target pattern", severity="warning")
             return
         direction = (
             self._search_patterns.patterns[-1].query.direction
@@ -565,21 +569,15 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         else:
             self._search_current = (self._search_current - 1) % len(self._nav_matches)
         self.cursor_line = self._nav_matches[self._search_current][0]
-        # Update search status in app
-        try:
-            from logdelve.app import LogDelveApp  # noqa: PLC0415
-
-            app = self.app
-            if isinstance(app, LogDelveApp):
-                app.update_search_status()
-        except ImportError:
-            pass
+        # Always refresh to update current-match underline (even on same line)
+        self.refresh()
+        self._notify_search_status()
 
     def action_prev_match(self) -> None:
-        """Go to the previous nav-enabled search match."""
+        """Go to the previous match of the target pattern."""
         if not self._nav_matches:
             if self._search_matches:
-                self.app.notify("No patterns enabled for navigation", severity="warning")
+                self.app.notify("No matches for target pattern", severity="warning")
             return
         direction = (
             self._search_patterns.patterns[-1].query.direction
@@ -591,7 +589,12 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         else:
             self._search_current = (self._search_current + 1) % len(self._nav_matches)
         self.cursor_line = self._nav_matches[self._search_current][0]
-        # Update search status in app
+        # Always refresh to update current-match underline (even on same line)
+        self.refresh()
+        self._notify_search_status()
+
+    def _notify_search_status(self) -> None:
+        """Notify the app to update search status display."""
         try:
             from logdelve.app import LogDelveApp  # noqa: PLC0415
 

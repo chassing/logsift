@@ -104,6 +104,8 @@ class SearchPatternSet(BaseModel):
 
     patterns: list[SearchPattern] = []
     _next_color: int = PrivateAttr(default=0)
+    # Which pattern index n/N navigates (single-pattern navigation)
+    nav_target_index: int = 0
 
     def add(self, query: SearchQuery) -> SearchPattern | None:
         """Add a pattern with the next available color index.
