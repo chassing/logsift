@@ -10,7 +10,7 @@ def _make_line(
     content: str,
     line_number: int = 1,
     content_type: ContentType = ContentType.TEXT,
-    parsed_json: dict | None = None,
+    parsed_json: dict | None = None,  # type: ignore[type-arg]
     log_level: LogLevel | None = None,
 ) -> LogLine:
     return LogLine(

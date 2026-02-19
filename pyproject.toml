@@ -109,7 +109,7 @@ ignore = [
 ]
 
 [tool.mypy]
-src = ["src", "tests", "scripts"]
+files = ["src", "tests", "scripts"]
 python_version = "3.13"
 strict = true
 enable_error_code = ["truthy-bool", "redundant-expr"]
