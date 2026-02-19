@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from datetime import datetime
 
 from logdelve.filters import apply_filters, check_line
-from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchQuery
-from logdelve.search import find_matches
+from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchPatternSet, SearchQuery
+from logdelve.search import find_all_pattern_matches
 from logdelve.widgets.log_line import get_line_height, render_json_expanded
 
 # Distinct colors for component tags (work on dark and light backgrounds)
@@ -33,6 +33,31 @@ _COMPONENT_COLORS = [
     Color.parse("#d19a66"),  # orange
     Color.parse("#be5046"),  # dark red
 ]
+
+# 10 distinct background color pairs (normal, bright) for multi-pattern search highlights.
+# White foreground text on tinted backgrounds. First entry matches the original single-search highlight.
+_SEARCH_COLORS: list[tuple[str, str]] = [
+    ("#6e5600", "#9e7c00"),  # amber (matches current single-search highlight)
+    ("#5c1a1a", "#8c2a2a"),  # red
+    ("#1a4a5c", "#2a7a8c"),  # teal
+    ("#3d1a5c", "#5d2a8c"),  # purple
+    ("#1a5c2e", "#2a8c4e"),  # green
+    ("#5c3a1a", "#8c5a2a"),  # orange
+    ("#1a2a5c", "#2a4a8c"),  # blue
+    ("#5c1a4a", "#8c2a7a"),  # magenta
+    ("#3a5c1a", "#5a8c2a"),  # olive
+    ("#1a5c5c", "#2a8c8c"),  # cyan
+]
+
+
+def search_match_style(color_index: int) -> Style:
+    """Return the normal (non-current) highlight style for a search pattern."""
+    return Style(bgcolor=_SEARCH_COLORS[color_index][0], color="#ffffff")
+
+
+def search_current_style(color_index: int) -> Style:
+    """Return the current-match highlight style for a search pattern (brighter + bold)."""
+    return Style(bgcolor=_SEARCH_COLORS[color_index][1], color="#ffffff", bold=True)
 
 
 class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
@@ -65,16 +90,6 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         color: $text-disabled;
     }
 
-    LogView > .logview--search-match {
-        background: #6e5600;
-        color: #ffffff;
-    }
-
-    LogView > .logview--search-current {
-        background: #9e7c00;
-        color: #ffffff;
-    }
-
     LogView > .logview--level-error {
         background: #3d1518;
     }
@@ -104,8 +119,6 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         "logview--json",
         "logview--text",
         "logview--line-number",
-        "logview--search-match",
-        "logview--search-current",
         "logview--level-error",
         "logview--level-warn",
         "logview--level-debug",
@@ -155,12 +168,12 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         # Anomaly detection
         self._anomaly_scores: dict[int, float] = {}
         self._anomaly_filter: bool = False
-        # Search state
-        self._search_query: SearchQuery | None = None
-        self._search_matches: list[tuple[int, int, int]] = []
+        # Search state (multi-pattern)
+        self._search_patterns: SearchPatternSet = SearchPatternSet()
+        self._search_matches: list[tuple[int, int, int, int]] = []  # (line_idx, start, end, pattern_index)
         self._search_current: int = -1
         # Pre-computed: matches grouped by visible line index for fast render lookup
-        self._search_matches_by_line: dict[int, list[tuple[int, int]]] = {}
+        self._search_matches_by_line: dict[int, list[tuple[int, int, int]]] = {}  # (start, end, pattern_index)
         # Bookmarks: original line index → annotation text (empty = no annotation)
         self._bookmarks: dict[int, str] = {}
 
@@ -233,7 +246,21 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
     @property
     def has_search(self) -> bool:
-        return self._search_query is not None
+        """Whether any search patterns are active."""
+        return not self._search_patterns.is_empty
+
+    @property
+    def search_patterns(self) -> SearchPatternSet:
+        """The active search pattern set."""
+        return self._search_patterns
+
+    @property
+    def search_pattern_match_counts(self) -> list[tuple[int, int]]:
+        """Per-pattern match counts as (count, color_index) for each pattern."""
+        counts: dict[int, int] = {}
+        for _, _, _, pat_idx in self._search_matches:
+            counts[pat_idx] = counts.get(pat_idx, 0) + 1
+        return [(counts.get(i, 0), p.color_index) for i, p in enumerate(self._search_patterns.patterns)]
 
     @property
     def search_match_count(self) -> int:
@@ -288,7 +315,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self._apply_filters()
         self.restore_cursor(orig_idx)
         # Re-run search on filtered lines
-        if self._search_query:
+        if not self._search_patterns.is_empty:
             self._compute_search_matches()
         self.refresh()
 
@@ -386,7 +413,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self._min_level = level
         self._apply_filters()
         self.restore_cursor(orig_idx)
-        if self._search_query:
+        if not self._search_patterns.is_empty:
             self._compute_search_matches()
         self.refresh()
 
@@ -455,8 +482,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
     # --- Search ---
 
     def set_search(self, query: SearchQuery) -> None:
-        """Set a search query and find all matches."""
-        self._search_query = query
+        """Add a search pattern and find all matches."""
+        result = self._search_patterns.add(query)
+        if result is None:
+            self.app.notify("Maximum 10 search patterns", severity="warning")
+            return
         self._compute_search_matches()
         # Jump to first match from current cursor position
         if self._search_matches:
@@ -464,36 +494,40 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self.refresh()
 
     def clear_search(self) -> None:
-        """Clear the current search."""
-        self._search_query = None
+        """Clear all search patterns."""
+        self._search_patterns = SearchPatternSet()
         self._search_matches = []
         self._search_current = -1
         self._search_matches_by_line = {}
         self.refresh()
 
     def _compute_search_matches(self) -> None:
-        """Compute all search matches for visible lines."""
-        if not self._search_query:
+        """Compute all search matches for visible lines across all patterns."""
+        if self._search_patterns.is_empty:
             self._search_matches = []
             self._search_current = -1
             self._search_matches_by_line = {}
             return
         visible = self.lines
-        self._search_matches = find_matches(visible, self._search_query)
+        self._search_matches = find_all_pattern_matches(visible, self._search_patterns)
         self._search_current = -1
         # Group by line index for efficient rendering
         self._search_matches_by_line = {}
-        for _i, (line_idx, start, end) in enumerate(self._search_matches):
-            self._search_matches_by_line.setdefault(line_idx, []).append((start, end))
+        for line_idx, start, end, pat_idx in self._search_matches:
+            self._search_matches_by_line.setdefault(line_idx, []).append((start, end, pat_idx))
 
     def _jump_to_nearest_match(self) -> None:
         """Jump to the nearest match from the current cursor position."""
         if not self._search_matches:
             return
-        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        direction = (
+            self._search_patterns.patterns[-1].query.direction
+            if self._search_patterns.patterns
+            else SearchDirection.FORWARD
+        )
         if direction == SearchDirection.FORWARD:
             # Find first match at or after cursor
-            for i, (line_idx, _, _) in enumerate(self._search_matches):
+            for i, (line_idx, _, _, _) in enumerate(self._search_matches):
                 if line_idx >= self.cursor_line:
                     self._search_current = i
                     self.cursor_line = line_idx
@@ -517,7 +551,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         """Go to the next search match."""
         if not self._search_matches:
             return
-        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        direction = (
+            self._search_patterns.patterns[-1].query.direction
+            if self._search_patterns.patterns
+            else SearchDirection.FORWARD
+        )
         if direction == SearchDirection.FORWARD:
             self._search_current = (self._search_current + 1) % len(self._search_matches)
         else:
@@ -537,7 +575,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         """Go to the previous search match."""
         if not self._search_matches:
             return
-        direction = self._search_query.direction if self._search_query else SearchDirection.FORWARD
+        direction = (
+            self._search_patterns.patterns[-1].query.direction
+            if self._search_patterns.patterns
+            else SearchDirection.FORWARD
+        )
         if direction == SearchDirection.FORWARD:
             self._search_current = (self._search_current - 1) % len(self._search_matches)
         else:
@@ -593,13 +635,15 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         else:
             bg_style = Style()
 
-        # Get search matches for this line
+        # Get search matches for this line (now with pattern_index)
         line_matches = self._search_matches_by_line.get(line_index)
         current_match_offsets: tuple[int, int] | None = None
+        current_pattern_index: int = -1
         if self._search_current >= 0 and self._search_current < len(self._search_matches):
             cm = self._search_matches[self._search_current]
             if cm[0] == line_index:
                 current_match_offsets = (cm[1], cm[2])
+                current_pattern_index = cm[3]
 
         if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
             strips = render_json_expanded(
@@ -611,10 +655,6 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             segments = [Segment(f"  {line.raw}", timestamp_style + bg_style)]
             strip = Strip(segments)
         else:
-            search_match_style = self.get_component_rich_style("logview--search-match") if line_matches else None
-            search_current_style = (
-                self.get_component_rich_style("logview--search-current") if current_match_offsets else None
-            )
             # Check anomaly status using original line index
             orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
             is_anomaly = orig_idx in self._anomaly_scores
@@ -626,9 +666,8 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 text_style,
                 bg_style,
                 line_matches,
-                search_match_style,
                 current_match_offsets,
-                search_current_style,
+                current_pattern_index=current_pattern_index,
                 is_anomaly=is_anomaly,
                 orig_idx=orig_idx,
             )
@@ -661,15 +700,14 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         json_style: Style,
         text_style: Style,
         bg_style: Style,
-        search_matches: list[tuple[int, int]] | None = None,
-        search_match_style: Style | None = None,
+        search_matches: list[tuple[int, int, int]] | None = None,
         current_match: tuple[int, int] | None = None,
-        search_current_style: Style | None = None,
         *,
+        current_pattern_index: int = -1,
         is_anomaly: bool = False,
         orig_idx: int = 0,
     ) -> list[Segment]:
-        """Render a single compact log line with optional search highlighting."""
+        """Render a single compact log line with optional multi-pattern search highlighting."""
         segments: list[Segment] = []
 
         # Anomaly marker
@@ -724,21 +762,27 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         content_style = json_style if line.content_type == ContentType.JSON else text_style
 
-        if search_matches and search_match_style:
-            # Render content with search match highlighting
+        if search_matches:
+            # Render content with multi-pattern search match highlighting
             # Matches are in raw offsets; compute content offset
             content_start = line.content_offset
             content_text = line.content
 
             # Collect match ranges that overlap with content portion
-            highlights: list[tuple[int, int, bool]] = []  # (start, end, is_current) relative to content
-            for m_start, m_end in search_matches:
+            # (start, end, is_current, pattern_index) relative to content
+            highlights: list[tuple[int, int, bool, int]] = []
+            for m_start, m_end, pat_idx in search_matches:
                 # Convert from raw offset to content offset
                 cs = max(0, m_start - content_start)
                 ce = min(len(content_text), m_end - content_start)
                 if cs < ce:
-                    is_current = current_match is not None and m_start == current_match[0] and m_end == current_match[1]
-                    highlights.append((cs, ce, is_current))
+                    is_current = (
+                        current_match is not None
+                        and m_start == current_match[0]
+                        and m_end == current_match[1]
+                        and pat_idx == current_pattern_index
+                    )
+                    highlights.append((cs, ce, is_current, pat_idx))
 
             if highlights:
                 segments.extend(
@@ -746,8 +790,6 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                         content_text,
                         highlights,
                         content_style + bg_style,
-                        search_match_style,
-                        search_current_style or search_match_style,
                     )
                 )
             else:
@@ -760,25 +802,61 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         return segments
 
-    @staticmethod
     def _split_with_highlights(
+        self,
         text: str,
-        highlights: list[tuple[int, int, bool]],
+        highlights: list[tuple[int, int, bool, int]],
         normal_style: Style,
-        match_style: Style,
-        current_style: Style,
     ) -> list[Segment]:
-        """Split text into segments with highlighted search matches."""
+        """Split text into segments with multi-pattern highlighted search matches.
+
+        Uses "shortest match wins" overlap resolution: when multiple patterns
+        overlap, the pattern with the shorter match span gets its color displayed.
+        Longer matches are painted first, then shorter ones overwrite, so the
+        shortest match always wins.
+        """
+        if not highlights:
+            return [Segment(text, normal_style)]
+
+        # Determine the minimum highlight start for optimization
+        min_pos = min(h[0] for h in highlights)
+
+        # Paint character-level assignments: longest first, shortest overwrites
+        # Each entry: (pattern_index, is_current)
+        assignments: dict[int, tuple[int, bool]] = {}
+        sorted_by_len = sorted(highlights, key=lambda h: h[1] - h[0], reverse=True)
+        for start, end, is_current, pat_idx in sorted_by_len:
+            for pos in range(start, end):
+                assignments[pos] = (pat_idx, is_current)
+
+        # Walk through text building segments, merging consecutive identical styles
         segments: list[Segment] = []
         pos = 0
-        for start, end, is_current in sorted(highlights):
-            if pos < start:
-                segments.append(Segment(text[pos:start], normal_style))
-            style = current_style if is_current else match_style
-            segments.append(Segment(text[start:end], style))
-            pos = end
-        if pos < len(text):
-            segments.append(Segment(text[pos:], normal_style))
+        while pos < len(text):
+            if pos not in assignments:
+                # Find the end of this normal (non-highlighted) run
+                run_end = pos + 1
+                while run_end < len(text) and run_end not in assignments:
+                    run_end += 1
+                # Optimization: skip scanning beyond max_pos for normal text between highlights
+                if pos < min_pos:
+                    run_end = min(run_end, min_pos)
+                segments.append(Segment(text[pos:run_end], normal_style))
+                pos = run_end
+            else:
+                pat_idx, is_current = assignments[pos]
+                color_index = self._search_patterns.patterns[pat_idx].color_index
+                style = search_current_style(color_index) if is_current else search_match_style(color_index)
+                # Find the end of this highlighted run with the same style
+                run_end = pos + 1
+                while run_end < len(text) and run_end in assignments:
+                    next_pat, next_cur = assignments[run_end]
+                    if next_pat != pat_idx or next_cur != is_current:
+                        break
+                    run_end += 1
+                segments.append(Segment(text[pos:run_end], style))
+                pos = run_end
+
         return segments
 
     @staticmethod
