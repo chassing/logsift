@@ -121,6 +121,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         reference_date: datetime | None = None,
         bookmarks: dict[int, str] | None = None,
         all_lines: list[Any] | None = None,
+        nav_current_pattern: int = -1,
     ) -> None:
         super().__init__()
         self._direction = direction
@@ -136,6 +137,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             search_patterns._next_color if search_patterns else 0  # noqa: SLF001
         )
         self._editing_index: int | None = None
+        # Which pattern is the current n/N navigation target (arrow indicator)
+        self._nav_target_index: int = nav_current_pattern
 
     def compose(self) -> ComposeResult:
         self._titles = {
@@ -163,21 +166,12 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                 classes="hint",
             )
 
-    def _compose_search_tab(self) -> ComposeResult:
-        # Pre-fill with last pattern's text if patterns exist
-        initial_value = ""
-        initial_case = False
-        initial_regex = False
-        if self._working_patterns:
-            last = self._working_patterns[-1]
-            initial_value = last.query.pattern
-            initial_case = last.query.case_sensitive
-            initial_regex = last.query.is_regex
-
-        yield Input(value=initial_value, placeholder="search pattern...", id="search-input")
+    @staticmethod
+    def _compose_search_tab() -> ComposeResult:
+        yield Input(placeholder="search pattern...", id="search-input")
         with Horizontal():
-            yield Checkbox("Case sensitive", initial_case, id="case-sensitive")
-            yield Checkbox("Regex", initial_regex, id="regex")
+            yield Checkbox("Case sensitive", id="case-sensitive")
+            yield Checkbox("Regex", id="regex")
         yield OptionList(id="pattern-list")
 
     @staticmethod
@@ -235,9 +229,13 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
     # --- Pattern list rendering ---
 
     @staticmethod
-    def _format_pattern(pattern: SearchPattern) -> Text:
+    def _format_pattern(pattern: SearchPattern, *, is_nav_target: bool = False) -> Text:
         """Format a search pattern as a Rich Text object for the OptionList."""
         text = Text()
+
+        # Arrow indicator for current n/N target
+        arrow = "\u25b6 " if is_nav_target else "  "
+        text.append(arrow, style="bold yellow" if is_nav_target else "")
 
         # Nav toggle icon
         nav_icon = "\u25cf" if pattern.nav_enabled else "\u25cb"
@@ -266,8 +264,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
 
         highlighted = ol.highlighted
         ol.clear_options()
-        for pattern in self._working_patterns:
-            ol.add_option(Option(self._format_pattern(pattern)))
+        for i, pattern in enumerate(self._working_patterns):
+            ol.add_option(Option(self._format_pattern(pattern, is_nav_target=i == self._nav_target_index)))
         if highlighted is not None and self._working_patterns:
             ol.highlighted = min(highlighted, len(self._working_patterns) - 1)
 
@@ -302,7 +300,11 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         step = 1 if forward else -1
         next_id = self._TAB_ORDER[(idx + step) % len(self._TAB_ORDER)]
         with contextlib.suppress(NoMatches):
-            self.query_one(f"#{next_id}").focus()
+            widget = self.query_one(f"#{next_id}")
+            widget.focus()
+            # Auto-highlight first item when focusing OptionList
+            if isinstance(widget, OptionList) and widget.highlighted is None and widget.option_count > 0:
+                widget.highlighted = 0
 
     def _handle_search_tab_key(self, event: Key, focused: object) -> None:
         """Handle key events specific to the Search tab."""
@@ -446,7 +448,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
         # In-place update to preserve scroll position
         ol.replace_option_prompt_at_index(
             index,
-            self._format_pattern(self._working_patterns[index]),
+            self._format_pattern(self._working_patterns[index], is_nav_target=index == self._nav_target_index),
         )
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:

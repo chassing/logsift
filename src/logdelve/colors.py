@@ -26,5 +26,5 @@ def search_match_style(color_index: int) -> Style:
 
 
 def search_current_style(color_index: int) -> Style:
-    """Return the current-match highlight style for a search pattern (brighter + bold)."""
-    return Style(bgcolor=_SEARCH_COLORS[color_index][1], color="#ffffff", bold=True)
+    """Return the current-match highlight style for a search pattern (brighter + bold + underline)."""
+    return Style(bgcolor=_SEARCH_COLORS[color_index][1], color="#ffffff", bold=True, underline=True)

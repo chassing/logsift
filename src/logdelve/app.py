@@ -470,6 +470,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
                 reference_date=ref_date,
                 bookmarks=log_view.get_bookmarks(),
                 all_lines=log_view._all_lines,  # noqa: SLF001
+                nav_current_pattern=log_view.nav_current_pattern_index,
             ),
             callback=self._on_navigation_result,
         )
