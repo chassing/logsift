@@ -96,6 +96,7 @@ class SearchPattern(BaseModel):
 
     query: SearchQuery
     color_index: int
+    nav_enabled: bool = True
 
 
 class SearchPatternSet(BaseModel):
@@ -137,6 +138,43 @@ class SearchPatternSet(BaseModel):
         """Remove all patterns."""
         self.patterns.clear()
         self._next_color = 0
+
+    def remove_at(self, index: int) -> SearchPattern | None:
+        """Remove pattern at index, return it or None if out of range."""
+        if 0 <= index < len(self.patterns):
+            return self.patterns.pop(index)
+        return None
+
+    def update_at(self, index: int, query: SearchQuery) -> bool:
+        """Update the query at index, preserving color_index and nav_enabled.
+
+        Returns True if updated, False if index out of range.
+        """
+        if not (0 <= index < len(self.patterns)):
+            return False
+        existing = self.patterns[index]
+        self.patterns[index] = SearchPattern(
+            query=query,
+            color_index=existing.color_index,
+            nav_enabled=existing.nav_enabled,
+        )
+        return True
+
+    def toggle_nav(self, index: int) -> bool | None:
+        """Toggle nav_enabled on pattern at index.
+
+        Returns the new nav_enabled state, or None if index out of range.
+        """
+        if not (0 <= index < len(self.patterns)):
+            return None
+        existing = self.patterns[index]
+        new_nav = not existing.nav_enabled
+        self.patterns[index] = SearchPattern(
+            query=existing.query,
+            color_index=existing.color_index,
+            nav_enabled=new_nav,
+        )
+        return new_nav
 
     @property
     def active_count(self) -> int:
