@@ -163,7 +163,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                     yield from self._compose_bookmarks_tab()
 
             yield Label(
-                "Enter: add/update | Del: remove | Space: highlight | S-Space: n/N target | Esc: apply",
+                "Enter: add/update | Del: remove | Space: highlight | >: n/N target | Esc: apply",
                 classes="hint",
             )
 
@@ -338,8 +338,8 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             event.stop()
             self._toggle_nav_highlighted()
 
-        # Shift+Space on pattern-list: set as n/N target
-        if event.key == "shift+space" and is_pattern_list:
+        # > on pattern-list: set as n/N target (matches ▶ indicator)
+        if event.key == "greater_than_sign" and is_pattern_list:
             event.prevent_default()
             event.stop()
             try:
