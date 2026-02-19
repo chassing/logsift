@@ -412,8 +412,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         status_bar = self.query_one("#status-bar", StatusBar)
         if log_view.has_search:
             pattern_counts = log_view.search_pattern_match_counts
-            current = log_view.search_current_index + 1 if log_view.search_match_count > 0 else 0
-            total = log_view.search_match_count
+            current = log_view.search_current_index + 1 if log_view.nav_match_count > 0 else 0
+            total = log_view.nav_match_count
             status_bar.set_search_pattern_info(current, total, pattern_counts)
         else:
             status_bar.clear_search_info()

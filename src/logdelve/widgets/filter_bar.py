@@ -113,13 +113,14 @@ class FilterBar(Widget):
         return text
 
     def _render_search_chips(self, text: Text, s: str) -> None:
-        """Render color-coded search pattern chips with overflow handling."""
+        """Render color-coded search pattern chips with nav indicator and overflow handling."""
         assert self._search_patterns is not None
         available_width = max(10, self.size.width - 40)
         used_width = 0
         total_patterns = self._search_patterns.active_count
         for shown, pattern in enumerate(self._search_patterns.patterns):
-            chip_text = f" {pattern.query.pattern} "
+            nav_icon = "\u25cf" if pattern.nav_enabled else "\u25cb"
+            chip_text = f" {nav_icon}{pattern.query.pattern} "
             chip_width = len(chip_text)
             # Check if this chip fits, accounting for potential +N badge
             remaining = total_patterns - shown - 1
