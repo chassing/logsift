@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from rich.text import Text
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
@@ -16,11 +17,18 @@ if TYPE_CHECKING:
     from textual.binding import BindingType
     from textual.events import Key
 
-from logdelve.models import SearchDirection, SearchQuery
+from logdelve.colors import _SEARCH_COLORS
+from logdelve.models import (
+    _MAX_SEARCH_PATTERNS,
+    SearchDirection,
+    SearchPattern,
+    SearchPatternSet,
+    SearchQuery,
+)
 from logdelve.widgets.timestamp_input import TimestampInput
 
 
-class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
+class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
     """Modal dialog with tabs for Search, Go to Line, and Jump to Timestamp."""
 
     DEFAULT_CSS = """
@@ -30,8 +38,8 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
 
     NavigationDialog > Vertical {
         width: 90%;
-        height: 80%;
-        max-height: 35;
+        height: auto;
+        max-height: 80%;
         background: $surface;
         border: tall $accent;
         padding: 1 2;
@@ -93,6 +101,12 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
         color: $text-muted;
         margin-top: 1;
     }
+
+    NavigationDialog #pattern-list {
+        height: auto;
+        max-height: 12;
+        margin-top: 1;
+    }
     """
 
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -102,7 +116,7 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
     def __init__(
         self,
         direction: SearchDirection,
-        last_query: SearchQuery | None = None,
+        search_patterns: SearchPatternSet | None = None,
         initial_tab: str = "tab-search",
         reference_date: datetime | None = None,
         bookmarks: dict[int, str] | None = None,
@@ -110,18 +124,23 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
     ) -> None:
         super().__init__()
         self._direction = direction
-        self._last_query = last_query
         self._initial_tab = initial_tab
         self._reference_date = reference_date
         self._bookmarks = bookmarks or {}
         self._all_lines = all_lines or []
         self._bookmark_indices: list[int] = sorted(self._bookmarks.keys())
 
+        # Working copy of patterns for dialog manipulation
+        self._working_patterns: list[SearchPattern] = list(search_patterns.patterns) if search_patterns else []
+        self._next_color: int = (
+            search_patterns._next_color if search_patterns else 0  # noqa: SLF001
+        )
+        self._editing_index: int | None = None
+        self._highlighted_index: int | None = None
+
     def compose(self) -> ComposeResult:
         self._titles = {
-            "tab-search": "🔍 Search forward (/)"
-            if self._direction == SearchDirection.FORWARD
-            else "🔍 Search backward (?)",
+            "tab-search": "Search forward (/)" if self._direction == SearchDirection.FORWARD else "Search backward (?)",
             "tab-line": "Go to line (:)",
             "tab-time": "Jump to timestamp (@)",
             "tab-bookmarks": f"Bookmarks ({len(self._bookmarks)})",
@@ -140,16 +159,27 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
                 with TabPane("Bookmarks", id="tab-bookmarks"):
                     yield from self._compose_bookmarks_tab()
 
-            yield Label("Enter to apply, Escape to cancel", classes="hint")
+            yield Label(
+                "Enter: apply  Tab: add pattern  Del: remove  Space: toggle nav",
+                classes="hint",
+            )
 
     def _compose_search_tab(self) -> ComposeResult:
-        initial_value = self._last_query.pattern if self._last_query else ""
-        initial_case = self._last_query.case_sensitive if self._last_query else False
-        initial_regex = self._last_query.is_regex if self._last_query else False
+        # Pre-fill with last pattern's text if patterns exist
+        initial_value = ""
+        initial_case = False
+        initial_regex = False
+        if self._working_patterns:
+            last = self._working_patterns[-1]
+            initial_value = last.query.pattern
+            initial_case = last.query.case_sensitive
+            initial_regex = last.query.is_regex
+
         yield Input(value=initial_value, placeholder="search pattern...", id="search-input")
         with Horizontal():
             yield Checkbox("Case sensitive", initial_case, id="case-sensitive")
             yield Checkbox("Regex", initial_regex, id="regex")
+        yield OptionList(id="pattern-list")
 
     @staticmethod
     def _compose_line_tab() -> ComposeResult:
@@ -173,6 +203,7 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
         yield ol
 
     def on_mount(self) -> None:
+        self._rebuild_pattern_list()
         self._focus_active_tab_content()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
@@ -202,14 +233,244 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
         except NoMatches:
             pass
 
+    # --- Pattern list rendering ---
+
+    def _format_pattern(self, index: int, pattern: SearchPattern) -> Text:
+        """Format a search pattern as a Rich Text object for the OptionList."""
+        text = Text()
+
+        # Arrow indicator for highlighted pattern
+        arrow = "\u25b6 " if index == self._highlighted_index else "  "
+        text.append(arrow, style="bold")
+
+        # Nav toggle icon
+        nav_icon = "\u25cf" if pattern.nav_enabled else "\u25cb"
+        nav_style = "green" if pattern.nav_enabled else "dim"
+        text.append(f"{nav_icon} ", style=nav_style)
+
+        # Color swatch with pattern text
+        color_idx = pattern.color_index % len(_SEARCH_COLORS)
+        bgcolor = _SEARCH_COLORS[color_idx][0]
+        text.append(f" {pattern.query.pattern} ", style=f"#ffffff on {bgcolor}")
+
+        # Flags
+        if pattern.query.case_sensitive:
+            text.append(" Aa", style="dim")
+        if pattern.query.is_regex:
+            text.append(" .*", style="dim")
+
+        return text
+
+    def _rebuild_pattern_list(self) -> None:
+        """Rebuild the OptionList with current working patterns."""
+        try:
+            ol = self.query_one("#pattern-list", OptionList)
+        except NoMatches:
+            return
+
+        highlighted = ol.highlighted
+        ol.clear_options()
+        for i, pattern in enumerate(self._working_patterns):
+            ol.add_option(Option(self._format_pattern(i, pattern)))
+        if highlighted is not None and self._working_patterns:
+            ol.highlighted = min(highlighted, len(self._working_patterns) - 1)
+
+    # --- Key handling ---
+
     def on_key(self, event: Key) -> None:
-        """Handle Enter on checkboxes and TimestampInput."""
+        """Handle special keys for Search tab interactions."""
         focused = self.focused
 
+        # Enter on checkbox submits the search
         if event.key == "enter" and isinstance(focused, Checkbox):
             event.prevent_default()
             event.stop()
             self._submit_search()
+            return
+
+        # Only intercept Tab/Delete/Space when Search tab is active
+        try:
+            tabs = self.query_one("#nav-tabs", TabbedContent)
+            if tabs.active != "tab-search":
+                return
+        except NoMatches:
+            return
+
+        # Tab on search input: add current input as pattern
+        if event.key == "tab" and isinstance(focused, Input) and focused.id == "search-input":
+            event.prevent_default()
+            event.stop()
+            self._add_current_input_as_pattern()
+            return
+
+        # Delete/Backspace on empty search input: remove highlighted pattern
+        if (
+            event.key in {"delete", "backspace"}
+            and isinstance(focused, Input)
+            and focused.id == "search-input"
+            and not focused.value
+        ):
+            event.prevent_default()
+            event.stop()
+            self._remove_highlighted_pattern()
+            return
+
+        # Space on pattern-list: toggle nav
+        if event.key == "space" and isinstance(focused, OptionList) and focused.id == "pattern-list":
+            event.prevent_default()
+            event.stop()
+            self._toggle_nav_highlighted()
+            return
+
+    # --- Pattern management ---
+
+    def _add_current_input_as_pattern(self) -> None:
+        """Add the current input value as a new pattern or update the edited one."""
+        try:
+            inp = self.query_one("#search-input", Input)
+        except NoMatches:
+            return
+
+        pattern_text = inp.value.strip()
+        if not pattern_text:
+            return
+
+        case_sensitive = self.query_one("#case-sensitive", Checkbox).value
+        is_regex = self.query_one("#regex", Checkbox).value
+
+        query = SearchQuery(
+            pattern=pattern_text,
+            case_sensitive=case_sensitive,
+            is_regex=is_regex,
+            direction=self._direction,
+        )
+
+        if self._editing_index is not None:
+            # Update existing pattern at editing index
+            idx = self._editing_index
+            if 0 <= idx < len(self._working_patterns):
+                existing = self._working_patterns[idx]
+                self._working_patterns[idx] = SearchPattern(
+                    query=query,
+                    color_index=existing.color_index,
+                    nav_enabled=existing.nav_enabled,
+                )
+            self._editing_index = None
+        else:
+            # Add new pattern
+            if len(self._working_patterns) >= _MAX_SEARCH_PATTERNS:
+                self.notify("Maximum 10 patterns reached", severity="warning")
+                return
+
+            # Find next unused color
+            used_indices = {p.color_index for p in self._working_patterns}
+            color_index = self._next_color
+            for _ in range(_MAX_SEARCH_PATTERNS):
+                if color_index not in used_indices:
+                    break
+                color_index = (color_index + 1) % _MAX_SEARCH_PATTERNS
+            else:
+                return  # All colors taken
+
+            self._working_patterns.append(SearchPattern(query=query, color_index=color_index))
+            self._next_color = (color_index + 1) % _MAX_SEARCH_PATTERNS
+
+        # Clear input and reset checkboxes
+        inp.value = ""
+        self.query_one("#case-sensitive", Checkbox).value = False
+        self.query_one("#regex", Checkbox).value = False
+        self._rebuild_pattern_list()
+
+    def _remove_highlighted_pattern(self) -> None:
+        """Remove the highlighted pattern from the working list."""
+        try:
+            ol = self.query_one("#pattern-list", OptionList)
+        except NoMatches:
+            return
+
+        index = ol.highlighted
+        if index is None or not (0 <= index < len(self._working_patterns)):
+            return
+
+        self._working_patterns.pop(index)
+
+        # Adjust editing index
+        if self._editing_index == index:
+            self._editing_index = None
+        elif self._editing_index is not None and self._editing_index > index:
+            self._editing_index -= 1
+
+        # Clear input
+        try:
+            inp = self.query_one("#search-input", Input)
+            inp.value = ""
+            self.query_one("#case-sensitive", Checkbox).value = False
+            self.query_one("#regex", Checkbox).value = False
+        except NoMatches:
+            pass
+
+        self._editing_index = None
+        self._rebuild_pattern_list()
+
+    def _toggle_nav_highlighted(self) -> None:
+        """Toggle nav_enabled on the highlighted pattern."""
+        try:
+            ol = self.query_one("#pattern-list", OptionList)
+        except NoMatches:
+            return
+
+        index = ol.highlighted
+        if index is None or not (0 <= index < len(self._working_patterns)):
+            return
+
+        existing = self._working_patterns[index]
+        self._working_patterns[index] = SearchPattern(
+            query=existing.query,
+            color_index=existing.color_index,
+            nav_enabled=not existing.nav_enabled,
+        )
+
+        # In-place update to preserve scroll position
+        ol.replace_option_prompt_at_index(
+            index,
+            self._format_pattern(index, self._working_patterns[index]),
+        )
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        """Pre-fill input when highlighting a pattern in the list."""
+        if event.option_list.id != "pattern-list":
+            return
+
+        index = event.option_index
+        old_highlighted = self._highlighted_index
+        self._highlighted_index = index
+
+        if not (0 <= index < len(self._working_patterns)):
+            return
+
+        pattern = self._working_patterns[index]
+
+        # Pre-fill input and checkboxes for editing
+        try:
+            inp = self.query_one("#search-input", Input)
+            inp.value = pattern.query.pattern
+            self.query_one("#case-sensitive", Checkbox).value = pattern.query.case_sensitive
+            self.query_one("#regex", Checkbox).value = pattern.query.is_regex
+            self._editing_index = index
+        except NoMatches:
+            pass
+
+        # Update arrow indicators
+        ol = event.option_list
+        if old_highlighted is not None and 0 <= old_highlighted < len(self._working_patterns):
+            ol.replace_option_prompt_at_index(
+                old_highlighted,
+                self._format_pattern(old_highlighted, self._working_patterns[old_highlighted]),
+            )
+        ol.replace_option_prompt_at_index(
+            index,
+            self._format_pattern(index, self._working_patterns[index]),
+        )
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Handle bookmark selection."""
@@ -227,30 +488,30 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
         elif input_id == "ts-input":
             self._submit_timestamp()
 
-    def _submit_search(self) -> None:
-        """Submit the search with current input and options."""
+    # --- Submission methods ---
+
+    def _build_pattern_set(self) -> SearchPatternSet | None:
+        """Build a SearchPatternSet from the working patterns."""
+        if not self._working_patterns:
+            return None
+        pattern_set = SearchPatternSet()
+        pattern_set.patterns = list(self._working_patterns)
+        pattern_set._next_color = self._next_color  # noqa: SLF001
+        return pattern_set
+
+    def _add_input_if_present(self) -> None:
+        """If the input has text, add it as a pattern first."""
         try:
             inp = self.query_one("#search-input", Input)
+            if inp.value.strip():
+                self._add_current_input_as_pattern()
         except NoMatches:
-            self.dismiss(None)
-            return
+            pass
 
-        pattern = inp.value.strip()
-        if not pattern:
-            self.dismiss(None)
-            return
-
-        case_sensitive = self.query_one("#case-sensitive", Checkbox).value
-        is_regex = self.query_one("#regex", Checkbox).value
-
-        self.dismiss(
-            SearchQuery(
-                pattern=pattern,
-                case_sensitive=case_sensitive,
-                is_regex=is_regex,
-                direction=self._direction,
-            )
-        )
+    def _submit_search(self) -> None:
+        """Submit the search with current patterns."""
+        self._add_input_if_present()
+        self.dismiss(self._build_pattern_set())
 
     def _submit_line(self) -> None:
         """Submit go-to-line."""
@@ -290,4 +551,14 @@ class NavigationDialog(ModalScreen[SearchQuery | int | datetime | None]):
             self.dismiss(result)
 
     def action_cancel(self) -> None:
+        """Escape keeps changes - build pattern set from working patterns."""
+        # Check if on search tab - if so, add input text
+        try:
+            tabs = self.query_one("#nav-tabs", TabbedContent)
+            if tabs.active == "tab-search":
+                self._add_input_if_present()
+                self.dismiss(self._build_pattern_set())
+                return
+        except NoMatches:
+            pass
         self.dismiss(None)

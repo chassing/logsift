@@ -13,7 +13,15 @@ from textual.worker import get_current_worker
 
 from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
-from logdelve.models import ContentType, FilterRule, FilterType, LogLevel, LogLine, SearchDirection, SearchQuery
+from logdelve.models import (
+    ContentType,
+    FilterRule,
+    FilterType,
+    LogLevel,
+    LogLine,
+    SearchDirection,
+    SearchPatternSet,
+)
 from logdelve.reader import read_file, read_file_async, read_file_remaining_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
 from logdelve.widgets.filter_bar import FilterBar
@@ -446,11 +454,10 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         ref_date = self._get_reference_date()
         log_view = self.query_one("#log-view", LogView)
         patterns = log_view.search_patterns
-        last_query = patterns.patterns[-1].query if patterns.patterns else None
         self.push_screen(
             NavigationDialog(
                 direction,
-                last_query=last_query,
+                search_patterns=patterns if not patterns.is_empty else None,
                 initial_tab=initial_tab,
                 reference_date=ref_date,
                 bookmarks=log_view.get_bookmarks(),
@@ -471,12 +478,12 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     def action_jump_to_time(self) -> None:
         self._open_navigation(SearchDirection.FORWARD, initial_tab="tab-time")
 
-    def _on_navigation_result(self, result: SearchQuery | int | datetime | None) -> None:
+    def _on_navigation_result(self, result: SearchPatternSet | int | datetime | None) -> None:
         if result is None:
             return
-        if isinstance(result, SearchQuery):
+        if isinstance(result, SearchPatternSet):
             log_view = self.query_one("#log-view", LogView)
-            log_view.set_search(result)
+            log_view.set_search_patterns(result)
             self._update_search_display()
         elif isinstance(result, int):
             log_view = self.query_one("#log-view", LogView)

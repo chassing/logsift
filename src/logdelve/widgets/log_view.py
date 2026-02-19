@@ -469,6 +469,14 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             self._jump_to_nearest_match()
         self.refresh()
 
+    def set_search_patterns(self, pattern_set: SearchPatternSet) -> None:
+        """Replace the entire search pattern set and recompute matches."""
+        self._search_patterns = pattern_set
+        self._compute_search_matches()
+        if self._search_matches:
+            self._jump_to_nearest_match()
+        self.refresh()
+
     def clear_search(self) -> None:
         """Clear all search patterns."""
         self._search_patterns = SearchPatternSet()
