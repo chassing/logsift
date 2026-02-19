@@ -139,7 +139,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._parser = parser
         self._tail_paused: bool = False
         self._tail_buffer: list[LogLine] = []
-        self._last_search: SearchQuery | None = None
+        # Search state lives in LogView._search_patterns (source of truth)
         self._filters_suspended: bool = False
         self._suspended_rules: list[FilterRule] = []
         self._suspended_level: LogLevel | None = None
@@ -389,15 +389,24 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             filter_bar.set_anomaly_info(self._anomaly_result.anomaly_count, filter_active=log_view.anomaly_filter)
         status_bar.set_bookmark_count(log_view.bookmark_count)
         filter_bar.set_bookmark_count(log_view.bookmark_count)
+        self.update_search_status()
+
+    def _update_search_display(self) -> None:
+        """Update FilterBar and StatusBar with current multi-pattern search state."""
+        log_view = self.query_one("#log-view", LogView)
+        filter_bar = self.query_one("#filter-bar", FilterBar)
+        filter_bar.set_search_patterns(log_view.search_patterns)
+        self.update_search_status()
 
     def update_search_status(self) -> None:
         """Update status bar with current search match info."""
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
-        if log_view.search_match_count > 0:
-            status_bar.set_search_info(log_view.search_current_index + 1, log_view.search_match_count)
-        elif log_view.has_search:
-            status_bar.set_search_info(0, 0)
+        if log_view.has_search:
+            pattern_counts = log_view.search_pattern_match_counts
+            current = log_view.search_current_index + 1 if log_view.search_match_count > 0 else 0
+            total = log_view.search_match_count
+            status_bar.set_search_pattern_info(current, total, pattern_counts)
         else:
             status_bar.clear_search_info()
 
@@ -436,10 +445,12 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     def _open_navigation(self, direction: SearchDirection, initial_tab: str = "tab-search") -> None:
         ref_date = self._get_reference_date()
         log_view = self.query_one("#log-view", LogView)
+        patterns = log_view.search_patterns
+        last_query = patterns.patterns[-1].query if patterns.patterns else None
         self.push_screen(
             NavigationDialog(
                 direction,
-                last_query=self._last_search,
+                last_query=last_query,
                 initial_tab=initial_tab,
                 reference_date=ref_date,
                 bookmarks=log_view.get_bookmarks(),
@@ -464,12 +475,9 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         if result is None:
             return
         if isinstance(result, SearchQuery):
-            self._last_search = result
-            filter_bar = self.query_one("#filter-bar", FilterBar)
-            filter_bar.set_search_text(result.pattern)
             log_view = self.query_one("#log-view", LogView)
             log_view.set_search(result)
-            self.update_search_status()
+            self._update_search_display()
         elif isinstance(result, int):
             log_view = self.query_one("#log-view", LogView)
             log_view.jump_to_line(result)
