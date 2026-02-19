@@ -59,8 +59,8 @@ class TestLogLine:
 
 class TestContentType:
     def test_values(self) -> None:
-        assert ContentType.JSON == "json"
-        assert ContentType.TEXT == "text"
+        assert ContentType.JSON == "json"  # type: ignore[comparison-overlap]
+        assert ContentType.TEXT == "text"  # type: ignore[comparison-overlap]
 
     def test_str_enum(self) -> None:
         assert str(ContentType.JSON) == "json"

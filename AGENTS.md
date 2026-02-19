@@ -360,6 +360,7 @@ make gifs                         # generate GIF recordings from docs/tapes/
 
 ## Do's
 
+- ALWAYS keep the main documentation (README.md, docs/guide.md, AGENTS.md (), help screen, keybinding tables) up to date with actual code!!!
 - Use pydantic models for all structured data.
 - Use Textual's built-in widgets and patterns where they fit.
 - Use async generators for reading log lines.

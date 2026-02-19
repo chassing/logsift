@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate deterministic demo log files for promotional VHS recordings.
 
 Modes:
@@ -12,6 +11,7 @@ Usage:
     python scripts/gen_promo_logs.py current-slow
 """
 
+# ruff: noqa: S311, PLR2004, PLR0914, T201, S108
 from __future__ import annotations
 
 import json
@@ -73,19 +73,29 @@ def gen_incident(base: datetime) -> list[str]:
             if i % 8 == 0:
                 # Slow query warnings from worker
                 dur = random.randint(500, 2000)
-                lines.append(gen_line(
-                    ts, WORKER, "warn",
-                    f"Slow query detected: SELECT * FROM orders WHERE status='pending'",
-                    duration_ms=dur, query_id=f"q-{i}",
-                ))
+                lines.append(
+                    gen_line(
+                        ts,
+                        WORKER,
+                        "warn",
+                        "Slow query detected: SELECT * FROM orders WHERE status='pending'",
+                        duration_ms=dur,
+                        query_id=f"q-{i}",
+                    )
+                )
             elif i % 12 == 0:
                 # Connection pool warnings from API
                 pool_active = random.randint(45, 50)
-                lines.append(gen_line(
-                    ts, API, "warn",
-                    "Database connection pool running low",
-                    pool_active=pool_active, pool_max=50,
-                ))
+                lines.append(
+                    gen_line(
+                        ts,
+                        API,
+                        "warn",
+                        "Database connection pool running low",
+                        pool_active=pool_active,
+                        pool_max=50,
+                    )
+                )
             else:
                 lines.extend(_normal_request_cycle(ts, i, req_counter))
                 req_counter += 1
@@ -99,26 +109,36 @@ def gen_incident(base: datetime) -> list[str]:
             # Phase 4: Continued errors with some recovery attempts
             if i % 4 == 0:
                 # Recovery attempt (no request lifecycle)
-                lines.append(gen_line(
-                    ts, API, "info",
-                    "Attempting database reconnection",
-                    attempt=random.randint(1, 5), pool_id="primary",
-                ))
+                lines.append(
+                    gen_line(
+                        ts,
+                        API,
+                        "info",
+                        "Attempting database reconnection",
+                        attempt=random.randint(1, 5),
+                        pool_id="primary",
+                    )
+                )
             elif i % 4 == 2:
                 # Memory pressure warning (no request lifecycle)
                 mem_pct = random.randint(88, 97)
-                lines.append(gen_line(
-                    ts, random.choice([API, WORKER]), "warn",
-                    "Memory usage critical",
-                    memory_pct=mem_pct, threshold=85,
-                ))
+                lines.append(
+                    gen_line(
+                        ts,
+                        random.choice([API, WORKER]),
+                        "warn",
+                        "Memory usage critical",
+                        memory_pct=mem_pct,
+                        threshold=85,
+                    )
+                )
             else:
                 # Failing request lifecycle
                 lines.extend(_failing_request_cycle(ts, i, req_counter))
             req_counter += 1
 
     # Sort by timestamp to ensure chronological order
-    lines.sort(key=lambda l: l.split("] ", 1)[1].split(" ", 1)[0])
+    lines.sort(key=lambda line: line.split("] ", 1)[1].split(" ", 1)[0])
     return lines
 
 
@@ -130,39 +150,60 @@ def _normal_request_cycle(base_ts: datetime, idx: int, req_num: int) -> list[str
     dur = random.randint(20, 80)
 
     # API receives request
-    lines.append(gen_line(
-        base_ts, API, "info",
-        f"Received GET {path}",
-        http_path=path, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            base_ts,
+            API,
+            "info",
+            f"Received GET {path}",
+            http_path=path,
+            request_id=req_id,
+        )
+    )
 
     # Cache lookup
     cache_ts = base_ts + timedelta(milliseconds=random.randint(1, 5))
     key = f"cache:{path.split('/')[-1]}:{random.randint(1, 50)}"
     hit = random.random() > 0.3
-    lines.append(gen_line(
-        cache_ts, CACHE, "debug",
-        f"Cache {'hit' if hit else 'miss'} for key {key}",
-        cache_key=key, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            cache_ts,
+            CACHE,
+            "debug",
+            f"Cache {'hit' if hit else 'miss'} for key {key}",
+            cache_key=key,
+            request_id=req_id,
+        )
+    )
 
     # Worker processing (for order/product paths)
     if "orders" in path or "products" in path:
         worker_ts = base_ts + timedelta(milliseconds=random.randint(5, 30))
-        lines.append(gen_line(
-            worker_ts, WORKER, "info",
-            f"Processing request for {path}",
-            http_path=path, request_id=req_id,
-        ))
+        lines.append(
+            gen_line(
+                worker_ts,
+                WORKER,
+                "info",
+                f"Processing request for {path}",
+                http_path=path,
+                request_id=req_id,
+            )
+        )
 
     # API completes request
     done_ts = base_ts + timedelta(milliseconds=dur)
-    lines.append(gen_line(
-        done_ts, API, "info",
-        f"Completed GET {path}",
-        http_path=path, http_status=200,
-        duration_ms=dur, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            done_ts,
+            API,
+            "info",
+            f"Completed GET {path}",
+            http_path=path,
+            http_status=200,
+            duration_ms=dur,
+            request_id=req_id,
+        )
+    )
 
     # Periodic health checks
     if idx % 15 == 0:
@@ -184,28 +225,43 @@ def _failing_request_cycle(base_ts: datetime, idx: int, req_num: int) -> list[st
     path = PATHS[idx % len(PATHS)]
 
     # API receives request (same as normal)
-    lines.append(gen_line(
-        base_ts, API, "info",
-        f"Received GET {path}",
-        http_path=path, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            base_ts,
+            API,
+            "info",
+            f"Received GET {path}",
+            http_path=path,
+            request_id=req_id,
+        )
+    )
 
     # Cache lookup (same as normal)
     cache_ts = base_ts + timedelta(milliseconds=random.randint(1, 5))
     key = f"cache:{path.split('/')[-1]}:{random.randint(1, 50)}"
-    lines.append(gen_line(
-        cache_ts, CACHE, "debug",
-        f"Cache miss for key {key}",
-        cache_key=key, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            cache_ts,
+            CACHE,
+            "debug",
+            f"Cache miss for key {key}",
+            cache_key=key,
+            request_id=req_id,
+        )
+    )
 
     # Worker tries to process (same as normal)
     worker_ts = base_ts + timedelta(milliseconds=random.randint(5, 30))
-    lines.append(gen_line(
-        worker_ts, WORKER, "info",
-        f"Processing request for {path}",
-        http_path=path, request_id=req_id,
-    ))
+    lines.append(
+        gen_line(
+            worker_ts,
+            WORKER,
+            "info",
+            f"Processing request for {path}",
+            http_path=path,
+            request_id=req_id,
+        )
+    )
 
     # Error: one of several failure modes
     error_ts = base_ts + timedelta(milliseconds=random.randint(50, 500))
@@ -213,45 +269,73 @@ def _failing_request_cycle(base_ts: datetime, idx: int, req_num: int) -> list[st
     if failure_type == 0:
         # DB connection refused
         host = f"10.0.1.{random.randint(1, 3)}"
-        lines.append(gen_line(
-            error_ts, WORKER, "error",
-            f"Connection refused to {host}:5432",
-            error_code="ECONNREFUSED", request_id=req_id,
-            retry=random.randint(1, 3),
-        ))
+        lines.append(
+            gen_line(
+                error_ts,
+                WORKER,
+                "error",
+                f"Connection refused to {host}:5432",
+                error_code="ECONNREFUSED",
+                request_id=req_id,
+                retry=random.randint(1, 3),
+            )
+        )
         # API gets the failure response
         api_err_ts = error_ts + timedelta(milliseconds=random.randint(5, 20))
-        lines.append(gen_line(
-            api_err_ts, API, "error",
-            f"Request failed: GET {path}",
-            http_path=path, http_status=500,
-            duration_ms=random.randint(500, 5000), request_id=req_id,
-        ))
+        lines.append(
+            gen_line(
+                api_err_ts,
+                API,
+                "error",
+                f"Request failed: GET {path}",
+                http_path=path,
+                http_status=500,
+                duration_ms=random.randint(500, 5000),
+                request_id=req_id,
+            )
+        )
     elif failure_type == 1:
         # Timeout
         dur = random.randint(5000, 30000)
-        lines.append(gen_line(
-            error_ts, API, "error",
-            f"Timeout after {dur}ms on {path}",
-            http_path=path, http_status=504,
-            duration_ms=dur, request_id=req_id,
-        ))
+        lines.append(
+            gen_line(
+                error_ts,
+                API,
+                "error",
+                f"Timeout after {dur}ms on {path}",
+                http_path=path,
+                http_status=504,
+                duration_ms=dur,
+                request_id=req_id,
+            )
+        )
     else:
         # Worker job failure
         job_type = random.choice(["process_order", "send_notification", "update_inventory"])
-        lines.append(gen_line(
-            error_ts, WORKER, "error",
-            f"Job failed: {job_type}",
-            job_type=job_type, request_id=req_id,
-            error="database connection timeout after 30s",
-        ))
+        lines.append(
+            gen_line(
+                error_ts,
+                WORKER,
+                "error",
+                f"Job failed: {job_type}",
+                job_type=job_type,
+                request_id=req_id,
+                error="database connection timeout after 30s",
+            )
+        )
         api_err_ts = error_ts + timedelta(milliseconds=random.randint(5, 20))
-        lines.append(gen_line(
-            api_err_ts, API, "error",
-            f"Request failed: GET {path}",
-            http_path=path, http_status=500,
-            duration_ms=random.randint(500, 5000), request_id=req_id,
-        ))
+        lines.append(
+            gen_line(
+                api_err_ts,
+                API,
+                "error",
+                f"Request failed: GET {path}",
+                http_path=path,
+                http_status=500,
+                duration_ms=random.randint(500, 5000),
+                request_id=req_id,
+            )
+        )
 
     return lines
 
@@ -336,32 +420,48 @@ def gen_current_slow(base: datetime) -> list[str]:
             # Novel: slow query
             table = random.choice(["orders", "users", "products", "inventory"])
             dur = random.randint(1500, 8000)
-            lines.append(gen_line(
-                ts, WORKER, "warn",
-                f"Slow query detected: SELECT * FROM {table}",
-                duration_ms=dur, query_id=f"q-{i}", table=table,
-            ))
+            lines.append(
+                gen_line(
+                    ts,
+                    WORKER,
+                    "warn",
+                    f"Slow query detected: SELECT * FROM {table}",  # noqa: S608
+                    duration_ms=dur,
+                    query_id=f"q-{i}",
+                    table=table,
+                )
+            )
             continue
 
         if i > 150 and i % 15 == 0:
             # Novel: connection pool exhausted
             pool_active = 50
-            lines.append(gen_line(
-                ts, API, "error",
-                "Connection pool exhausted, all connections in use",
-                pool_active=pool_active, pool_max=50,
-                waiting_requests=random.randint(5, 20),
-            ))
+            lines.append(
+                gen_line(
+                    ts,
+                    API,
+                    "error",
+                    "Connection pool exhausted, all connections in use",
+                    pool_active=pool_active,
+                    pool_max=50,
+                    waiting_requests=random.randint(5, 20),
+                )
+            )
             continue
 
         if i > 200 and i % 20 == 0:
             # Novel: memory critical
             mem_pct = random.randint(90, 98)
-            lines.append(gen_line(
-                ts, random.choice([API, WORKER]), "warn",
-                "Memory usage critical",
-                memory_pct=mem_pct, threshold=85,
-            ))
+            lines.append(
+                gen_line(
+                    ts,
+                    random.choice([API, WORKER]),
+                    "warn",
+                    "Memory usage critical",
+                    memory_pct=mem_pct,
+                    threshold=85,
+                )
+            )
             continue
 
         # Normal events, but with degraded performance after line 100

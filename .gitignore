@@ -16,3 +16,4 @@ docs/PHASE-*.md
 docs/anomaly-detection*
 .claude
 tmp/
+.planning/

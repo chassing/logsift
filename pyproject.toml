@@ -56,6 +56,7 @@ dev = [
 ]
 
 [tool.ruff]
+src = ["src", "tests", "scripts"]
 line-length = 120
 target-version = "py313"
 
@@ -108,6 +109,7 @@ ignore = [
 ]
 
 [tool.mypy]
+src = ["src", "tests", "scripts"]
 python_version = "3.13"
 strict = true
 enable_error_code = ["truthy-bool", "redundant-expr"]

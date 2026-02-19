@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
 """Generate realistic demo log files for VHS recordings."""
 
+# ruff: noqa: S311, PLR2004, PLR0914, T201
 from __future__ import annotations
 
 import json
@@ -52,28 +52,27 @@ def main() -> None:
                 extra["http_status"] = 200
                 extra["duration_seconds"] = round(random.uniform(0.01, 0.5), 3)
             lines.append(gen_line(ts, comp, level, event, **extra))
+        # Current: mix of normal + anomalies
+        elif i > 200 and random.random() < 0.15:
+            # Anomaly: connection errors (new pattern)
+            event = f"Connection refused to 10.0.{random.randint(1, 5)}.{random.randint(1, 254)}:5432"
+            lines.append(gen_line(ts, comp, "error", event, error_code="ECONNREFUSED", retry=random.randint(1, 3)))
+        elif i > 250 and random.random() < 0.1:
+            # Anomaly: timeout (new pattern)
+            event = f"Timeout after {random.randint(5000, 30000)}ms on {path}"
+            lines.append(gen_line(ts, comp, "error", event, http_path=path, http_status=504))
+        elif i > 300 and random.random() < 0.05:
+            # Anomaly: OOM warning (new pattern)
+            event = "Memory usage critical"
+            lines.append(gen_line(ts, comp, "warn", event, memory_pct=random.randint(90, 99), threshold=85))
         else:
-            # Current: mix of normal + anomalies
-            if i > 200 and random.random() < 0.15:
-                # Anomaly: connection errors (new pattern)
-                event = f"Connection refused to 10.0.{random.randint(1, 5)}.{random.randint(1, 254)}:5432"
-                lines.append(gen_line(ts, comp, "error", event, error_code="ECONNREFUSED", retry=random.randint(1, 3)))
-            elif i > 250 and random.random() < 0.1:
-                # Anomaly: timeout (new pattern)
-                event = f"Timeout after {random.randint(5000, 30000)}ms on {path}"
-                lines.append(gen_line(ts, comp, "error", event, http_path=path, http_status=504))
-            elif i > 300 and random.random() < 0.05:
-                # Anomaly: OOM warning (new pattern)
-                event = "Memory usage critical"
-                lines.append(gen_line(ts, comp, "warn", event, memory_pct=random.randint(90, 99), threshold=85))
-            else:
-                evt_template, level = random.choice(events_normal)
-                event = evt_template.format(path=path, key=key)
-                extra = {"http_path": path, "request_id": request_id}
-                if "Done" in event:
-                    extra["http_status"] = 200 if random.random() > 0.05 else 500
-                    extra["duration_seconds"] = round(random.uniform(0.01, 2.0 if i > 200 else 0.5), 3)
-                lines.append(gen_line(ts, comp, level, event, **extra))
+            evt_template, level = random.choice(events_normal)
+            event = evt_template.format(path=path, key=key)
+            extra = {"http_path": path, "request_id": request_id}
+            if "Done" in event:
+                extra["http_status"] = 200 if random.random() > 0.05 else 500
+                extra["duration_seconds"] = round(random.uniform(0.01, 2.0 if i > 200 else 0.5), 3)
+            lines.append(gen_line(ts, comp, level, event, **extra))
 
     for line in lines:
         print(line)

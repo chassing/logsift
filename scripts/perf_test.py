@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
 """Performance benchmark for logdelve core engines.
 
 Usage:
     uv run python scripts/perf_test.py
 """
 
+# ruff: noqa: PLR2004, T201
 from __future__ import annotations
 
 import time
@@ -12,7 +12,7 @@ from typing import Any
 
 from logdelve.filters import apply_filters
 from logdelve.models import FilterRule, FilterType, LogLine, SearchDirection, SearchQuery
-from logdelve.parser import parse_line
+from logdelve.parsers.auto import AutoParser
 from logdelve.search import find_matches
 
 # --- Log line templates ---
@@ -28,6 +28,7 @@ TEXT_TEMPLATES = [
     "Jan 15 10:30:{sec:02d} myhost syslogd: message {n}",
     "2024-01-15T10:30:{sec:02d}Z Health check passed (attempt {n})",
 ]
+parser = AutoParser()
 
 
 def generate_lines(count: int) -> list[str]:
@@ -89,16 +90,16 @@ def run_benchmark(count: int) -> dict[str, Any]:
 
     # Parse
     parse_start = time.perf_counter()
-    lines = [parse_line(i + 1, raw) for i, raw in enumerate(raw_lines)]
+    lines = [parser.parse_line(i + 1, raw) for i, raw in enumerate(raw_lines)]
     parse_time = time.perf_counter() - parse_start
 
     # Filter
     filter_time = bench_filter(lines)
 
-    # Search (text)
+    # Search - text
     search_time = bench_search(lines)
 
-    # Search (regex)
+    # Search - regex
     search_regex_time = bench_search_regex(lines)
 
     return {
