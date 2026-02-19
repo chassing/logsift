@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime  # noqa: TC003 - Pydantic needs this at runtime for model field resolution
 from enum import StrEnum
 from typing import Any
@@ -89,6 +90,16 @@ class SearchQuery(BaseModel):
 
 
 _MAX_SEARCH_PATTERNS = 10
+_MAX_HISTORY = 5
+
+
+@dataclass(slots=True)
+class SearchHistoryEntry:
+    """A recorded search pattern with its options."""
+
+    pattern: str
+    case_sensitive: bool
+    is_regex: bool
 
 
 class SearchPattern(BaseModel):

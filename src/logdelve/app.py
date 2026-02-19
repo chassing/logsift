@@ -20,6 +20,7 @@ from logdelve.models import (
     LogLevel,
     LogLine,
     SearchDirection,
+    SearchHistoryEntry,
     SearchPatternSet,
 )
 from logdelve.reader import read_file, read_file_async, read_file_remaining_async, read_pipe_async
@@ -161,6 +162,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._loading_complete: bool = file_size is None and file_paths is None
         self._cli_start_time = start_time
         self._cli_end_time = end_time
+        self._search_history: list[SearchHistoryEntry] = []
         self._file_paths = file_paths
         self._file_parsers = file_parsers
         self._file_initial_counts = file_initial_counts
@@ -471,6 +473,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
                 bookmarks=log_view.get_bookmarks(),
                 all_lines=log_view._all_lines,  # noqa: SLF001
                 nav_current_pattern=log_view.nav_current_pattern_index,
+                search_history=self._search_history,
             ),
             callback=self._on_navigation_result,
         )
