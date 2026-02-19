@@ -163,7 +163,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
                     yield from self._compose_bookmarks_tab()
 
             yield Label(
-                "Enter: add/update | Del: remove | Space: toggle highlight | Escape: apply & close",
+                "Enter: add/update | Del: remove | Space: highlight | S-Space: n/N target | Esc: apply",
                 classes="hint",
             )
 
@@ -332,11 +332,23 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             self._submit_search()
             return
 
-        # Space on pattern-list: toggle nav (highlight visibility)
+        # Space on pattern-list: toggle highlight visibility
         if event.key == "space" and is_pattern_list:
             event.prevent_default()
             event.stop()
             self._toggle_nav_highlighted()
+
+        # Shift+Space on pattern-list: set as n/N target
+        if event.key == "shift+space" and is_pattern_list:
+            event.prevent_default()
+            event.stop()
+            try:
+                ol = self.query_one("#pattern-list", OptionList)
+            except NoMatches:
+                return
+            index = ol.highlighted
+            if index is not None and 0 <= index < len(self._working_patterns):
+                self._set_nav_target(index)
 
     # --- Pattern management ---
 
@@ -508,11 +520,7 @@ class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):
             if orig_idx < len(self._all_lines):
                 self.dismiss(self._all_lines[orig_idx].line_number)
         elif event.option_list.id == "pattern-list":
-            # Enter on pattern-list: set as n/N target + focus Input for editing
-            index = event.option_index
-            if 0 <= index < len(self._working_patterns):
-                self._set_nav_target(index)
-
+            # Enter on pattern-list: focus Input for editing
             import contextlib  # noqa: PLC0415
 
             with contextlib.suppress(NoMatches):
