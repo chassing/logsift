@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from rich.style import Style
 from rich.text import Text
 from textual.widget import Widget
 
+from logdelve.colors import _SEARCH_COLORS
 from logdelve.models import LogLevel
 
 _MILLION = 1_000_000
@@ -13,7 +15,7 @@ _THOUSAND = 1_000
 
 
 def _format_count(n: int) -> str:
-    """Format a line count compactly: 1234 → '1,234', 1234567 → '1.2M'."""
+    """Format a line count compactly: 1234 -> '1,234', 1234567 -> '1.2M'."""
     if n >= _MILLION:
         return f"{n / _MILLION:.1f}M"
     if n >= _TEN_THOUSAND:
@@ -42,6 +44,7 @@ class StatusBar(Widget):
         self._new_lines: int = 0
         self._search_current: int | None = None
         self._search_total: int | None = None
+        self._pattern_counts: list[tuple[int, int]] | None = None
         self._level_counts: dict[LogLevel, int] = {}
         self._min_level: LogLevel | None = None
         self._anomaly_count: int = 0
@@ -66,9 +69,17 @@ class StatusBar(Widget):
         self.refresh()
 
     def set_search_info(self, current: int, total: int) -> None:
-        """Set search match info."""
+        """Set search match info (single-pattern backward compat)."""
         self._search_current = current
         self._search_total = total
+        self._pattern_counts = None
+        self.refresh()
+
+    def set_search_pattern_info(self, current: int, total: int, pattern_counts: list[tuple[int, int]]) -> None:
+        """Set search match info with per-pattern counts."""
+        self._search_current = current
+        self._search_total = total
+        self._pattern_counts = pattern_counts or None
         self.refresh()
 
     def set_level_counts(self, counts: dict[LogLevel, int], min_level: LogLevel | None = None) -> None:
@@ -103,7 +114,30 @@ class StatusBar(Widget):
         """Clear search info from status bar."""
         self._search_current = None
         self._search_total = None
+        self._pattern_counts = None
         self.refresh()
+
+    def _render_search_counts(self, text: Text) -> None:
+        """Render search match counts with per-pattern coloring."""
+        if self._search_total is None:
+            return
+        if self._search_total == 0:
+            text.append("  No matches", style="bold italic")
+        elif self._pattern_counts:
+            # Per-pattern colored counts: [current/count1+count2+...]
+            text.append("  [")
+            if self._search_current is not None and self._search_current > 0:
+                text.append(str(self._search_current), style="bold")
+            text.append("/")
+            for i, (count, color_index) in enumerate(self._pattern_counts):
+                if i > 0:
+                    text.append("+")
+                fg_hex = _SEARCH_COLORS[color_index][0]
+                text.append(str(count), style=Style(color=fg_hex, bold=True))
+            text.append("]")
+        else:
+            # Fallback: single count format
+            text.append(f"  [{self._search_current}/{self._search_total}]", style="bold")
 
     def render(self) -> Text:  # noqa: C901, PLR0912
         text = Text()
@@ -128,11 +162,7 @@ class StatusBar(Widget):
         if self._new_lines > 0:
             text.append(f"  +{self._new_lines} new", style="bold")
 
-        if self._search_total is not None:
-            if self._search_total == 0:
-                text.append("  No matches", style="bold italic")
-            else:
-                text.append(f"  [{self._search_current}/{self._search_total}]", style="bold")
+        self._render_search_counts(text)
 
         # Level counts
         if self._level_counts:
@@ -149,7 +179,7 @@ class StatusBar(Widget):
             if parts:
                 text.append(f"  {' '.join(parts)}", style="bold")
             if self._min_level is not None:
-                text.append(f"  ≥{self._min_level.value.upper()}", style="italic")
+                text.append(f"  \u2265{self._min_level.value.upper()}", style="italic")
 
         if self._anomaly_count > 0:
             text.append(f"  A:{self._anomaly_count}", style="bold red")
