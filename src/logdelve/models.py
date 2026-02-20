@@ -207,11 +207,14 @@ class AppConfig(BaseModel):
 
 
 class Session(BaseModel):
-    """A named set of filter rules and bookmarks."""
+    """A named set of filter rules, bookmarks, search patterns, and history."""
 
     name: str
     filters: list[FilterRule] = []
     bookmarks: dict[int, str] = {}
     source_files: list[str] = []
+    search_patterns: list[SearchPattern] = []
+    search_history: list[SearchHistoryEntry] = []
+    version: int = 1
     created_at: datetime
     updated_at: datetime

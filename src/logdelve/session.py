@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -9,10 +10,65 @@ from typing import TYPE_CHECKING, Any
 import tomli_w
 
 from logdelve.config import get_sessions_dir
-from logdelve.models import FilterRule, Session
+from logdelve.models import (
+    FilterRule,
+    SearchDirection,
+    SearchHistoryEntry,
+    SearchPattern,
+    SearchQuery,
+    Session,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def _search_pattern_to_dict(pattern: SearchPattern) -> dict[str, Any]:
+    """Serialize a SearchPattern to a dict for TOML storage."""
+    return {
+        "pattern": pattern.query.pattern,
+        "case_sensitive": pattern.query.case_sensitive,
+        "is_regex": pattern.query.is_regex,
+        "nav_enabled": pattern.nav_enabled,
+    }
+
+
+def _dict_to_search_pattern(d: dict[str, Any], color_index: int) -> SearchPattern | None:
+    """Deserialize a dict to SearchPattern, returning None if invalid regex."""
+    if d.get("is_regex"):
+        try:
+            re.compile(d["pattern"])
+        except re.error:
+            return None
+    query = SearchQuery(
+        pattern=d["pattern"],
+        case_sensitive=d.get("case_sensitive", False),
+        is_regex=d.get("is_regex", False),
+        direction=SearchDirection.FORWARD,
+    )
+    return SearchPattern(
+        query=query,
+        color_index=color_index,
+        nav_enabled=d.get("nav_enabled", True),
+    )
+
+
+def _history_entry_to_dict(entry: SearchHistoryEntry) -> dict[str, Any]:
+    """Serialize a SearchHistoryEntry to a dict for TOML storage."""
+    return {
+        "pattern": entry.pattern,
+        "case_sensitive": entry.case_sensitive,
+        "is_regex": entry.is_regex,
+    }
+
+
+def _dict_to_history_entry(d: dict[str, Any]) -> SearchHistoryEntry:
+    """Deserialize a dict to SearchHistoryEntry."""
+    return SearchHistoryEntry(
+        pattern=d["pattern"],
+        case_sensitive=d.get("case_sensitive", False),
+        is_regex=d.get("is_regex", False),
+    )
 
 
 def save_session(session: Session) -> Path:
@@ -21,12 +77,15 @@ def save_session(session: Session) -> Path:
     path = sessions_dir / f"{session.name}.toml"
 
     data: dict[str, Any] = {
+        "version": session.version,
         "name": session.name,
         "created_at": session.created_at.isoformat(),
         "updated_at": session.updated_at.isoformat(),
         "filters": [_filter_to_dict(f) for f in session.filters],
         "source_files": session.source_files,
         "bookmarks": {str(k): v for k, v in session.bookmarks.items()},
+        "search_patterns": [_search_pattern_to_dict(p) for p in session.search_patterns],
+        "search_history": [_history_entry_to_dict(e) for e in session.search_history],
     }
 
     path.write_bytes(tomli_w.dumps(data).encode())
@@ -49,11 +108,28 @@ def load_session(name: str) -> Session:
     raw_bookmarks = data.get("bookmarks", {})
     bookmarks = {int(k): v for k, v in raw_bookmarks.items()}
 
+    # Deserialize search patterns with sequential color assignment
+    version = data.get("version", 0)
+    raw_patterns = data.get("search_patterns", [])
+    search_patterns: list[SearchPattern] = []
+    color_idx = 0
+    for sp in raw_patterns:
+        pattern = _dict_to_search_pattern(sp, color_index=color_idx)
+        if pattern is not None:
+            search_patterns.append(pattern)
+            color_idx += 1
+
+    # Deserialize search history
+    search_history = [_dict_to_history_entry(h) for h in data.get("search_history", [])]
+
     return Session(
         name=data["name"],
         filters=filters,
         bookmarks=bookmarks,
         source_files=data.get("source_files", []),
+        search_patterns=search_patterns,
+        search_history=search_history,
+        version=max(version, 1),
         created_at=datetime.fromisoformat(data["created_at"]),
         updated_at=datetime.fromisoformat(data["updated_at"]),
     )
@@ -82,6 +158,11 @@ def rename_session(old_name: str, new_name: str) -> None:
         session = Session(
             name=new_name,
             filters=session.filters,
+            bookmarks=session.bookmarks,
+            source_files=session.source_files,
+            search_patterns=session.search_patterns,
+            search_history=session.search_history,
+            version=session.version,
             created_at=session.created_at,
             updated_at=session.updated_at,
         )
@@ -89,10 +170,23 @@ def rename_session(old_name: str, new_name: str) -> None:
         old_path.unlink()
 
 
-def create_session(name: str, filters: list[FilterRule]) -> Session:
+def create_session(
+    name: str,
+    filters: list[FilterRule],
+    *,
+    search_patterns: list[SearchPattern] | None = None,
+    search_history: list[SearchHistoryEntry] | None = None,
+) -> Session:
     """Create a new Session with current timestamp."""
     now = datetime.now(tz=UTC)
-    return Session(name=name, filters=filters, created_at=now, updated_at=now)
+    return Session(
+        name=name,
+        filters=filters,
+        search_patterns=search_patterns or [],
+        search_history=search_history or [],
+        created_at=now,
+        updated_at=now,
+    )
 
 
 def _filter_to_dict(rule: FilterRule) -> dict[str, Any]:
