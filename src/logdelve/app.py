@@ -22,6 +22,7 @@ from logdelve.models import (
     SearchDirection,
     SearchHistoryEntry,
     SearchPatternSet,
+    Session,
 )
 from logdelve.reader import read_file, read_file_async, read_file_remaining_async, read_pipe_async
 from logdelve.session import create_session, load_session, save_session
@@ -192,13 +193,15 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         if self._session_name:
             try:
                 session = load_session(self._session_name)
-                # Restore bookmarks BEFORE filters (auto-save in _apply_filters would overwrite them)
+                # Restore bookmarks BEFORE filters so they survive filter application
                 if session.source_files == self._source_files and session.bookmarks:
                     log_view.set_bookmarks(dict(session.bookmarks))
                 elif session.bookmarks and session.source_files != self._source_files:
                     self.notify("Bookmarks skipped (different file)")
                 self._filter_rules = list(session.filters)
                 self._apply_filters()
+                # Restore search patterns AFTER filters so match computation runs against filtered lines
+                self._restore_search_from_session(session, log_view)
                 self.notify(f"Session '{self._session_name}' loaded")
             except FileNotFoundError:
                 pass
@@ -639,15 +642,36 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         self._update_status_bar()
 
     def _autosave_session(self) -> None:
-        """Auto-save current session (filters + bookmarks). Skip if nothing to save."""
+        """Auto-save current session (filters, bookmarks, search patterns, history). Skip if nothing to save."""
         log_view = self.query_one("#log-view", LogView)
         bookmarks = log_view.get_bookmarks()
-        if not self._filter_rules and not bookmarks:
+        search_patterns = log_view.search_patterns
+        has_data = (
+            bool(self._filter_rules) or bool(bookmarks) or not search_patterns.is_empty or bool(self._search_history)
+        )
+        if not has_data:
             return
-        session = create_session(self._session_name, self._filter_rules)
+        session = create_session(
+            self._session_name,
+            self._filter_rules,
+            search_patterns=list(search_patterns.patterns),
+            search_history=list(self._search_history),
+        )
         session.bookmarks = dict(bookmarks)
         session.source_files = self._source_files
         save_session(session)
+
+    def _restore_search_from_session(self, session: Session, log_view: LogView) -> None:
+        """Restore search patterns and history from a loaded session."""
+        if session.search_patterns:
+            pattern_set = SearchPatternSet()
+            pattern_set.patterns = list(session.search_patterns)
+            pattern_set._next_color = len(session.search_patterns) % 10  # noqa: SLF001
+            log_view.set_search_patterns(pattern_set)
+        else:
+            log_view.clear_search()
+        self._search_history = list(session.search_history) if session.search_history else []
+        self._update_search_display()
 
     # --- Export ---
 
@@ -750,6 +774,8 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
                 self.notify(f"Session '{result.name}' loaded (bookmarks skipped - different file)")
             else:
                 self.notify(f"Session '{result.name}' loaded")
+            # Restore search state (replaces current entirely)
+            self._restore_search_from_session(session, log_view)
             self._update_status_bar()
         elif result.action == SessionActionType.SAVE:
             self._session_name = result.name

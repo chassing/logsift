@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +17,9 @@ from logdelve.models import (
     SearchQuery,
 )
 from logdelve.session import create_session, delete_session, list_sessions, load_session, save_session
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestSession:
