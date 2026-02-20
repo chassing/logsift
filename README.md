@@ -27,11 +27,11 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[Component detection](docs/guide.md#component-detection)**: Kubernetes pods, Docker Compose services, JSON fields — with color-coded tags
 - **[Anomaly detection](docs/guide.md#anomaly-detection)**: Baseline comparison to find log patterns that are new or changed (`--baseline`)
 - **[Message analysis](docs/guide.md#message-analysis)**: Group log messages by event pattern, analyze JSON field value distributions
-- **[Search](docs/guide.md#search)**: Forward/backward search with regex, case-sensitive options, and match highlighting
+- **[Search](docs/guide.md#search)**: Multi-pattern search with up to 10 simultaneous patterns, each highlighted in a distinct color — with per-pattern n/N navigation control
 - **[Interactive filtering](docs/guide.md#filtering)**: Filter by text, regex, JSON key-value, component, or log level — tabbed dialog with multi-select
 - **[Filter management](docs/guide.md#filter-management)**: Reorder, toggle, edit, delete, suspend/resume all filters with cursor preservation
 - **[Bookmarks & Annotations](docs/guide.md#bookmarks--annotations)**: Mark lines, attach notes, navigate between bookmarks, persisted in sessions
-- **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete filter sessions with auto-save
+- **[Sessions](docs/guide.md#sessions)**: Save, load, rename, delete named sessions — persists filters, bookmarks, and search patterns with auto-save
 - **[Streaming large files](docs/guide.md#large-files)**: Chunked background loading for files up to 2-3GB with instant startup and progress display
 - **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
 - **[Flexible time parsing](docs/guide.md#time-parsing)**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
@@ -173,6 +173,7 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 | --------- | ------------------------ | --- | --------- | ------------------------- |
 | `f` / `F` | Filter in / out          |     | `/` / `?` | Search forward / backward |
 | `e`       | Cycle level filter       |     | `n` / `N` | Next / previous match     |
+| `Ctrl+D`  | Clear all search patterns |     |           |                           |
 | `!`       | Toggle anomaly filter    |     | `j`       | Toggle JSON pretty-print  |
 | `x`       | Suspend / resume filters |     | `c`       | Cycle component display   |
 | `m`       | Manage filters           |     | `a`       | Analyze messages          |

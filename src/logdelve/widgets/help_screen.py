@@ -40,6 +40,16 @@ HELP_TEXT = """\
   Search dialog has tabs: Search, Line, Time.
   /, ?, :, @ each open the respective tab.
 
+[bold]Multi-Pattern Search[/bold]
+  Enter (in dialog)                     Add / update pattern
+  Del                                   Remove selected pattern
+  Ctrl+D                                Clear all patterns
+  Space (on pattern)                    Toggle n/N participation (●/○)
+  > (on pattern)                        Set as n/N navigation target
+
+  Up to 10 patterns, each highlighted in a distinct color.
+  History dropdown shows recent patterns; select to restore.
+
 [bold]Display[/bold]
   j                                     Toggle pretty-print for ALL JSON lines
   Enter                                 Toggle pretty-print for current line (sticky)
@@ -77,6 +87,8 @@ HELP_TEXT = """\
 [bold]Sessions[/bold]
   s                                     Session manager (load, save, delete, rename)
   --session/-s                          Load session on startup (CLI)
+
+  Sessions save filters, bookmarks, search patterns, and history.
 
 [bold]Theme[/bold]
   t                                     Select theme
