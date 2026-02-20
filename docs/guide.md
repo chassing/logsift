@@ -379,6 +379,36 @@ Matches are highlighted in the log view. The current match has a brighter highli
 
 When you press `/` or `?` again, the dialog is pre-filled with your last search. The toolbar shows the active search text.
 
+### Multi-Pattern Search
+
+Open the search dialog with `/` or `?`. You can maintain up to 10 simultaneous search patterns, each highlighted in a distinct color across the log view.
+
+| Key                     | Action                                               |
+| ----------------------- | ---------------------------------------------------- |
+| Enter (on input)        | Add pattern (or update selected pattern)             |
+| Del                     | Remove selected pattern from list                    |
+| Ctrl+D                  | Clear all patterns                                   |
+| Space (on pattern)      | Toggle whether pattern participates in n/N (●/○)     |
+| > (on pattern)          | Set pattern as the n/N navigation target             |
+| Down arrow (from input) | Move focus into history dropdown                     |
+| Escape                  | Apply current patterns and close dialog              |
+
+A history dropdown appears below the input when it is empty. Select a previous pattern to restore it with its original options (case-sensitive, regex). History is session-scoped — it does not persist across app restarts.
+
+The toolbar shows color-coded chips for each active pattern. Solid circle (●) means the pattern participates in `n`/`N` navigation; hollow circle (○) means it is excluded. `n` / `N` navigate through matches of all nav-enabled patterns in line order. The status bar shows match counts per pattern, each count rendered in that pattern's color.
+
+**Example: find all errors and timeouts together**
+
+Press `/`, type `error`, press Enter. The pattern appears in the list highlighted in color 1. Type `timeout`, press Enter. Both patterns are now highlighted simultaneously across the log view. Press `n` to jump between matches of either pattern.
+
+**Example: focus n/N on one pattern**
+
+With two patterns active, select the second pattern in the list and press Space — its indicator changes from ● to ○. Now `n` / `N` only navigate through the first pattern's matches, while the second remains highlighted for visual reference.
+
+**Real-world scenario: outage investigation**
+
+You suspect a connection refused error and a retry storm are correlated. Add `connection refused` as pattern 1 and `retry` as pattern 2. Scroll through the log — both are highlighted, letting you visually correlate their timing. Toggle `n`/`N` on pattern 1 only (Space on pattern 2 to disable navigation) to step through each `connection refused` occurrence and confirm retries appear immediately after. Press Ctrl+D to clear all patterns when done.
+
 ### Go to Line
 
 ![Go to line demo](screenshots/goto-line.gif)
@@ -653,7 +683,7 @@ When you press `!` to toggle off the anomaly filter, the cursor stays on the sam
 
 Press `s` to open the session manager.
 
-Filter sessions are saved automatically on every filter change. They persist as TOML files in `~/.config/logdelve/sessions/`.
+Filter sessions are saved automatically on every filter change. They persist as TOML files in `~/.config/logdelve/sessions/`. Sessions also persist active search patterns and search history alongside filters and bookmarks.
 
 ### Session manager
 
