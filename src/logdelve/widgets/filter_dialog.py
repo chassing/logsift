@@ -10,16 +10,16 @@ from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label, SelectionList, TabbedContent, TabPane
 
+from logdelve.filters import flatten_json
+from logdelve.models import FilterRule, FilterType
+from logdelve.widgets.timestamp_input import TimestampInput
+
 if TYPE_CHECKING:
     from datetime import datetime
 
     from textual.app import ComposeResult
     from textual.binding import BindingType
     from textual.events import Key
-
-from logdelve.filters import flatten_json
-from logdelve.models import FilterRule, FilterType
-from logdelve.widgets.timestamp_input import TimestampInput
 
 
 class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):

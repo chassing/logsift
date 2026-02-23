@@ -12,11 +12,6 @@ from textual.screen import ModalScreen
 from textual.widgets import Checkbox, Input, Label, OptionList, TabbedContent, TabPane
 from textual.widgets.option_list import Option
 
-if TYPE_CHECKING:
-    from textual.app import ComposeResult
-    from textual.binding import BindingType
-    from textual.events import Key
-
 from logdelve.colors import _SEARCH_COLORS
 from logdelve.models import (
     _MAX_HISTORY,
@@ -28,6 +23,11 @@ from logdelve.models import (
     SearchQuery,
 )
 from logdelve.widgets.timestamp_input import TimestampInput
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
+    from textual.events import Key
 
 
 class NavigationDialog(ModalScreen[SearchPatternSet | int | datetime | None]):

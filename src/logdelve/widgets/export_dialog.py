@@ -10,11 +10,11 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Select
 
+from logdelve.export import ExportFormat
+
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
-
-from logdelve.export import ExportFormat
 
 
 @dataclass

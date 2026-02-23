@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from datetime import datetime
-
 from logdelve.models import FilterRule, FilterType, LogLine
 from logdelve.utils import parse_time
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 # Cache for parsed time range boundaries to avoid re-parsing per line
 _time_range_cache: dict[str, datetime] = {}

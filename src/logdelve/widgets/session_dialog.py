@@ -13,11 +13,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
+from logdelve.session import delete_session, list_sessions, rename_session
+
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
-
-from logdelve.session import delete_session, list_sessions, rename_session
 
 
 class SessionActionType(StrEnum):

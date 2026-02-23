@@ -10,11 +10,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from logdelve.models import ContentType, LogLevel, LogLine
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from datetime import datetime
-
-from logdelve.models import ContentType, LogLevel, LogLine
 
 # Log level normalization mapping
 LEVEL_MAP: dict[str, LogLevel] = {

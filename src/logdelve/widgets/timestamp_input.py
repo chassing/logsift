@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar
 
-if TYPE_CHECKING:
-    from datetime import datetime
-
-    from textual.app import ComposeResult
-
 from textual.containers import Vertical
 from textual.widgets import Input, Label
 
 from logdelve.utils import parse_time
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from textual.app import ComposeResult
 
 
 class TimestampInput(Vertical):

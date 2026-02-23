@@ -14,14 +14,14 @@ from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
 
-if TYPE_CHECKING:
-    from datetime import datetime
-
 from logdelve.colors import search_current_style, search_match_style
 from logdelve.filters import apply_filters, check_line
 from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchPatternSet, SearchQuery
 from logdelve.search import find_all_pattern_matches
 from logdelve.widgets.log_line import get_line_height, render_json_expanded
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 # Distinct colors for component tags (work on dark and light backgrounds)
 _COMPONENT_COLORS = [

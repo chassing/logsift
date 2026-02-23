@@ -10,13 +10,16 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from logdelve.export import ExportFormat, export_lines
+from logdelve.filters import apply_filters
+from logdelve.models import FilterRule, FilterType, LogLine
 from logdelve.parsers import ParserName, detect_parser, get_parser
 from logdelve.reader import is_pipe, read_file, read_file_initial
+from logdelve.session import load_session
+from logdelve.utils import parse_time
 
 if TYPE_CHECKING:
     from logdelve.parsers import LogParser
-
-from logdelve.models import FilterRule, FilterType, LogLine
 
 _CHUNKED_THRESHOLD = 1_000_000  # 1MB
 _TIMESTAMP_MIN = datetime.min.replace(tzinfo=UTC)
@@ -77,10 +80,6 @@ def _run_export(
     fmt: str,
 ) -> None:
     """Export filtered lines to file without TUI."""
-    from logdelve.export import ExportFormat, export_lines  # noqa: PLC0415
-    from logdelve.filters import apply_filters  # noqa: PLC0415
-    from logdelve.utils import parse_time  # noqa: PLC0415
-
     try:
         export_fmt = ExportFormat(fmt)
     except ValueError:
@@ -96,8 +95,6 @@ def _run_export(
     # Apply session filters
     rules: list[FilterRule] = []
     if session_name:
-        from logdelve.session import load_session  # noqa: PLC0415
-
         try:
             session = load_session(session_name)
             rules = list(session.filters)

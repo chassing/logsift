@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
 
@@ -15,9 +15,6 @@ from logdelve.aws import (
     tail_log_events,
 )
 from logdelve.utils import parse_time
-
-if TYPE_CHECKING:
-    from mypy_boto3_logs import CloudWatchLogsClient
 
 cw_app = typer.Typer(name="cloudwatch", help="AWS CloudWatch log operations")
 
@@ -38,24 +35,6 @@ _EndpointUrl = Annotated[
 ]
 
 
-def _client(
-    access_key: str | None,
-    secret_key: str | None,
-    session_token: str | None,
-    profile: str | None,
-    region: str | None,
-    endpoint_url: str | None,
-) -> CloudWatchLogsClient:
-    return create_client(
-        region=region,
-        profile=profile,
-        access_key=access_key,
-        secret_key=secret_key,
-        session_token=session_token,
-        endpoint_url=endpoint_url,
-    )
-
-
 @cw_app.command("get")
 def get_logs(
     log_group: Annotated[str, typer.Argument(help="CloudWatch log group name")],
@@ -74,7 +53,9 @@ def get_logs(
     aws_endpoint_url: _EndpointUrl = None,
 ) -> None:
     """Download CloudWatch log events to stdout."""
-    client = _client(aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url)
+    client = create_client(
+        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+    )
 
     start_time = parse_time(start)
     end_time = parse_time(end) if end else datetime.now(tz=UTC)
@@ -98,7 +79,9 @@ def groups(
     aws_endpoint_url: _EndpointUrl = None,
 ) -> None:
     """List CloudWatch log groups."""
-    client = _client(aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url)
+    client = create_client(
+        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+    )
     for name in list_log_groups(client, prefix=log_group_prefix):
         print(name)  # noqa: T201
 
@@ -115,6 +98,8 @@ def streams(
     aws_endpoint_url: _EndpointUrl = None,
 ) -> None:
     """List CloudWatch log streams."""
-    client = _client(aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url)
+    client = create_client(
+        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+    )
     for name in list_log_streams(client, log_group, prefix=prefix):
         print(name)  # noqa: T201

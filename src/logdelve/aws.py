@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import time
 from datetime import UTC, datetime
@@ -60,8 +61,6 @@ def _extract_message(raw_message: str, message_key: str | None) -> str:
     """
     if not message_key:
         return raw_message
-
-    import json  # noqa: PLC0415
 
     try:
         parsed = json.loads(raw_message)

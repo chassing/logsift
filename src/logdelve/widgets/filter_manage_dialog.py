@@ -11,11 +11,11 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
+from logdelve.models import FilterRule, FilterType
+
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
-
-from logdelve.models import FilterRule, FilterType
 
 
 class FilterManageDialog(ModalScreen[list[FilterRule] | None]):

@@ -11,10 +11,6 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-if TYPE_CHECKING:
-    from textual.app import ComposeResult
-    from textual.binding import BindingType
-
 from logdelve.models import FilterRule, FilterType, LogLevel, LogLine
 from logdelve.templates import (
     FieldGroup,
@@ -23,6 +19,10 @@ from logdelve.templates import (
     build_template_groups,
     template_to_regex,
 )
+
+if TYPE_CHECKING:
+    from textual.app import ComposeResult
+    from textual.binding import BindingType
 
 _LEVEL_ORDER: dict[LogLevel | None, int] = {
     LogLevel.FATAL: 0,
