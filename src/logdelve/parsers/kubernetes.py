@@ -13,10 +13,10 @@ from logdelve.parsers.base import (
 from logdelve.parsers.iso import IsoParser
 
 # Kubernetes/CloudWatch bracket: "[pod-name-abc123]"
-_K8S_BRACKET_RE = re.compile(r"^\[(?P<comp>[a-z0-9][\w.-]+)\]\s*")
+_K8S_BRACKET_RE = re.compile(r"^\[(?P<pod>[a-z0-9][\w.-]+)\]\s*")
 
 # Kubernetes prefix: "pod-name container 2024-..."
-_K8S_PREFIX_RE = re.compile(r"^(?P<comp>[a-z0-9][\w.-]+)\s+(?P<cont>[a-z0-9][\w.-]+)\s+(?=\d{4}-)")
+_K8S_PREFIX_RE = re.compile(r"^(?P<pod>[a-z0-9][\w.-]+)\s+(?P<container>[a-z0-9][\w.-]+)\s+(?=\d{4}-)")
 
 
 class KubernetesParser(LogParser):
@@ -38,19 +38,16 @@ class KubernetesParser(LogParser):
         component: str | None = None
         remainder = raw
 
-        # [pod-name] style
-        m = _K8S_BRACKET_RE.match(raw)
-        if m:
-            component = m.group("comp")
+        if m := _K8S_BRACKET_RE.match(raw):
+            # [pod-name] style
+            component = m.group("pod")
+            remainder = raw[m.end() :]
+        elif m := _K8S_PREFIX_RE.match(raw):
+            # pod-name container 2024-... style
+            component = f"{m.group('pod')}/{m.group('container')}"
             remainder = raw[m.end() :]
         else:
-            # pod-name container 2024-... style
-            m = _K8S_PREFIX_RE.match(raw)
-            if m:
-                component = m.group("comp")
-                remainder = raw[m.end() :]
-            else:
-                return None
+            return None
 
         # Parse the remainder for timestamp
         result = self._iso_parser.try_parse(remainder)
