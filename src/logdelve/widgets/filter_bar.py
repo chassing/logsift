@@ -29,8 +29,9 @@ class FilterBar(Widget):
 
     filters: reactive[list[FilterRule]] = reactive(list, always_update=True)
 
-    def __init__(self, *, id: str | None = None) -> None:  # noqa: A002
+    def __init__(self, *, id: str | None = None, bindings: dict[str, str] | None = None) -> None:  # noqa: A002
         super().__init__(id=id)
+        self._key_bindings = bindings or {}
         self._min_level: LogLevel | None = None
         self._has_levels: bool = False
         self._anomaly_count: int = 0
@@ -66,53 +67,71 @@ class FilterBar(Widget):
         self._nav_current_pattern = nav_current_pattern
         self.refresh()
 
+    def _k(self, action: str) -> str:
+        """Get human-readable display key for an action."""
+        from logdelve.keybindings import DEFAULT_BINDINGS, format_key_display  # noqa: PLC0415
+
+        key = self._key_bindings.get(action, DEFAULT_BINDINGS.get(action, "?"))
+        return format_key_display(key)
+
     def render(self) -> Text:
         text = Text()
         s = "  "
+        k = self._k
 
         # Search chips
         if self._search_patterns and self._search_patterns.active_count > 0:
             self._render_search_chips(text, s)
         else:
-            text.append(" /? \U0001f50d", style="dim")
+            text.append(f" {k('search_forward')}{k('search_backward')} \U0001f50d", style="dim")
 
         # Filters
         if self.filters:
             total = len(self.filters)
             active = sum(1 for r in self.filters if r.enabled)
             label = f"{active}/{total}" if active < total else str(total)
-            text.append(f"{s}f/F \u229e {label}", style="bold")
-            text.append(f"{s}m \U0001f4cb", style="dim")
+            text.append(f"{s}{k('filter_in')}/{k('filter_out')} \u229e {label}", style="bold")
+            text.append(f"{s}{k('manage_filters')} \U0001f4cb", style="dim")
         else:
-            text.append(f"{s}f/F \u229e", style="dim")
+            text.append(f"{s}{k('filter_in')}/{k('filter_out')} \u229e", style="dim")
 
         # Level
         if self._has_levels:
             if self._min_level is not None:
-                text.append(f"{s}e \u2265{self._min_level.value.upper()}", style="bold yellow")
+                text.append(f"{s}{k('cycle_level_filter')} \u2265{self._min_level.value.upper()}", style="bold yellow")
             else:
-                text.append(f"{s}e \u2265", style="dim")
+                text.append(f"{s}{k('cycle_level_filter')} \u2265", style="dim")
 
         # Anomalies
         if self._anomaly_count > 0:
             style = "bold red" if self._anomaly_filter_active else "dim"
-            text.append(f"{s}! \u26a0 {self._anomaly_count}", style=style)
+            text.append(f"{s}{k('toggle_anomalies')} \u26a0 {self._anomaly_count}", style=style)
 
         # Bookmarks
         if self._bookmark_count > 0:
-            text.append(f"{s}b/B \U0001f4cc {self._bookmark_count}", style="bold")
-            text.append(f"{s}A \u270f", style="dim")
+            text.append(f"{s}{k('toggle_bookmark')}/{k('list_bookmarks')} \U0001f4cc {self._bookmark_count}", style="bold")
+            text.append(f"{s}{k('annotate')} \u270f", style="dim")
         else:
-            text.append(f"{s}b/B \U0001f4cc", style="dim")
+            text.append(f"{s}{k('toggle_bookmark')}/{k('list_bookmarks')} \U0001f4cc", style="dim")
 
         # Right-aligned shortcuts
-        shortcuts = " @ \u23f1  : \U0001f4cd  r \U0001f517  a \U0001f4ca"
+        self._render_right_shortcuts(text)
+
+        return text
+
+    def _render_right_shortcuts(self, text: Text) -> None:
+        """Render right-aligned shortcut hints."""
+        k = self._k
+        shortcuts = (
+            f" {k('jump_to_time')} \u23f1"
+            f"  {k('goto_line')} \U0001f4cd"
+            f"  {k('show_related')} \U0001f517"
+            f"  {k('analyze')} \U0001f4ca"
+        )
         used = len(text.plain)
         padding = max(1, self.size.width - used - len(shortcuts))
         text.append(" " * padding)
         text.append(shortcuts, style="dim")
-
-        return text
 
     def _render_search_chips(self, text: Text, s: str) -> None:
         """Render color-coded search pattern chips with nav indicator and overflow handling."""

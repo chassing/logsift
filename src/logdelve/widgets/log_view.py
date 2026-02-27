@@ -103,20 +103,20 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
     }
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("up", "cursor_up", "Up", show=False),
-        Binding("down", "cursor_down", "Down", show=False),
-        Binding("pageup", "page_up", "Page Up", show=False),
-        Binding("pagedown", "page_down", "Page Down", show=False),
-        Binding("home", "scroll_home", "Home", show=False),
-        Binding("end", "scroll_end", "End", show=False),
-        Binding("g", "goto_top_or_prefix", "Top (gg)", show=False),
-        Binding("G", "scroll_end", "Bottom", show=False),
-        Binding("j", "toggle_json_global", "Expand"),
-        Binding("enter", "toggle_json_line", "Expand", show=False),
-        Binding("#", "toggle_line_numbers", "Lines#"),
-        Binding("c", "cycle_component_display", "Component"),
-        Binding("n", "next_match", "Next", show=False),
-        Binding("N", "prev_match", "Prev", show=False),
+        Binding("up", "cursor_up", "Up", show=False, id="cursor_up"),
+        Binding("down", "cursor_down", "Down", show=False, id="cursor_down"),
+        Binding("pageup", "page_up", "Page Up", show=False, id="page_up"),
+        Binding("pagedown", "page_down", "Page Down", show=False, id="page_down"),
+        Binding("home", "scroll_home", "Home", show=False, id="scroll_home"),
+        Binding("end", "scroll_end", "End", show=False, id="scroll_end"),
+        Binding("g", "goto_top_or_prefix", "Top (gg)", show=False, id="goto_top"),
+        Binding("G", "scroll_end", "Bottom", show=False, id="scroll_bottom"),
+        Binding("j", "toggle_json_global", "Expand", id="toggle_json_global"),
+        Binding("enter", "toggle_json_line", "Expand", show=False, id="toggle_json_line"),
+        Binding("#", "toggle_line_numbers", "Lines#", id="toggle_line_numbers"),
+        Binding("c", "cycle_component_display", "Component", id="cycle_component_display"),
+        Binding("n", "next_match", "Next", show=False, id="next_match"),
+        Binding("N", "prev_match", "Prev", show=False, id="prev_match"),
     ]
 
     cursor_line: reactive[int] = reactive(0)

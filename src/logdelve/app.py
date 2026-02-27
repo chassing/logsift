@@ -66,30 +66,30 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     ENABLE_COMMAND_PALETTE = False
 
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("s", "manage_sessions", "Sessions"),
-        Binding("x", "toggle_all_filters", "Filters off", show=False),
-        Binding("slash", "search_forward", "Search", show=False),
-        Binding("question_mark", "search_backward", "Search back", show=False),
-        Binding("colon", "goto_line", "Go to line", show=False),
-        Binding("at", "jump_to_time", "Jump to time", show=False),
-        Binding("f", "filter_in", "Filter in", show=False),
-        Binding("F", "filter_out", "Filter out", show=False),
-        Binding("b", "toggle_bookmark", "Bookmark", show=False),
-        Binding("B", "list_bookmarks", "Bookmarks", show=False),
-        Binding("left_square_bracket", "prev_bookmark", "Prev bookmark", show=False),
-        Binding("right_square_bracket", "next_bookmark", "Next bookmark", show=False),
-        Binding("A", "annotate", "Annotate", show=False),
-        Binding("r", "show_related", "Related", show=False),
-        Binding("ctrl+e", "export", "Export"),
-        Binding("a", "analyze", "Analyze", show=False),
-        Binding("m", "manage_filters", "Filters", show=False),
-        Binding("t", "toggle_theme", "Theme", show=False),
-        Binding("e", "cycle_level_filter", "Level", show=False),
-        Binding("exclamation_mark", "toggle_anomalies", "Anomalies", show=False),
-        Binding("q", "quit", "Quit"),
-        Binding("p", "toggle_tail_pause", "Tail pause", show=False),
-        Binding("h", "show_help", "Help"),
-        Binding("ctrl+s", "save_screenshot_svg", "Screenshot", show=False),
+        Binding("s", "manage_sessions", "Sessions", id="manage_sessions"),
+        Binding("x", "toggle_all_filters", "Filters off", show=False, id="toggle_all_filters"),
+        Binding("slash", "search_forward", "Search", show=False, id="search_forward"),
+        Binding("question_mark", "search_backward", "Search back", show=False, id="search_backward"),
+        Binding("colon", "goto_line", "Go to line", show=False, id="goto_line"),
+        Binding("at", "jump_to_time", "Jump to time", show=False, id="jump_to_time"),
+        Binding("f", "filter_in", "Filter in", show=False, id="filter_in"),
+        Binding("F", "filter_out", "Filter out", show=False, id="filter_out"),
+        Binding("b", "toggle_bookmark", "Bookmark", show=False, id="toggle_bookmark"),
+        Binding("B", "list_bookmarks", "Bookmarks", show=False, id="list_bookmarks"),
+        Binding("left_square_bracket", "prev_bookmark", "Prev bookmark", show=False, id="prev_bookmark"),
+        Binding("right_square_bracket", "next_bookmark", "Next bookmark", show=False, id="next_bookmark"),
+        Binding("A", "annotate", "Annotate", show=False, id="annotate"),
+        Binding("r", "show_related", "Related", show=False, id="show_related"),
+        Binding("ctrl+e", "export", "Export", id="export"),
+        Binding("a", "analyze", "Analyze", show=False, id="analyze"),
+        Binding("m", "manage_filters", "Filters", show=False, id="manage_filters"),
+        Binding("t", "toggle_theme", "Theme", show=False, id="toggle_theme"),
+        Binding("e", "cycle_level_filter", "Level", show=False, id="cycle_level_filter"),
+        Binding("exclamation_mark", "toggle_anomalies", "Anomalies", show=False, id="toggle_anomalies"),
+        Binding("q", "quit", "Quit", id="quit"),
+        Binding("p", "toggle_tail_pause", "Tail pause", show=False, id="toggle_tail_pause"),
+        Binding("h", "show_help", "Help", id="show_help"),
+        Binding("ctrl+s", "save_screenshot_svg", "Screenshot", show=False, id="save_screenshot_svg"),
         Binding("ctrl+b", "next_demo_label", "Demo", show=False),
         Binding("1", "toggle_filter(1)", "Toggle 1", show=False),
         Binding("2", "toggle_filter(2)", "Toggle 2", show=False),
@@ -119,8 +119,13 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         file_initial_counts: list[int] | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
+        keymap: dict[str, str] | None = None,
     ) -> None:
         super().__init__()
+        self._keymap = keymap or {}
+        from logdelve.keybindings import get_merged_bindings  # noqa: PLC0415
+
+        self._merged_keybindings = get_merged_bindings(keymap)
         self._lines = lines or []
         self._source = source
         self._filter_rules: list[FilterRule] = []
@@ -173,12 +178,15 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         return self._tail or self._pipe_fd is not None
 
     def compose(self) -> ComposeResult:
-        yield FilterBar(id="filter-bar")
+        yield FilterBar(id="filter-bar", bindings=self._merged_keybindings)
         yield LogView(id="log-view")
         yield StatusBar(source=self._source, id="status-bar")
         yield Footer()
 
     def on_mount(self) -> None:  # noqa: C901, PLR0912, PLR0915
+        if self._keymap:
+            self.set_keymap(self._keymap)
+
         log_view = self.query_one("#log-view", LogView)
         status_bar = self.query_one("#status-bar", StatusBar)
 
@@ -879,7 +887,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     # --- Help ---
 
     def action_show_help(self) -> None:
-        self.push_screen(HelpScreen())
+        self.push_screen(HelpScreen(bindings=self._merged_keybindings))
 
     def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
         """Hide pause binding when not streaming."""

@@ -175,7 +175,7 @@ def _run_multi_file(
 
     _sort_and_renumber(all_lines)
 
-    keymap = _load_and_validate_keymap()  # noqa: F841
+    keymap = _load_and_validate_keymap()
 
     from logdelve.app import LogDelveApp  # noqa: PLC0415
 
@@ -189,6 +189,7 @@ def _run_multi_file(
         file_initial_counts=file_initial_counts,
         start_time=start,
         end_time=end,
+        keymap=keymap,
     )
     log_app.run(mouse=False)
 
@@ -261,7 +262,7 @@ def inspect(  # noqa: C901, PLR0912
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
 
-    keymap = _load_and_validate_keymap()  # noqa: F841
+    keymap = _load_and_validate_keymap()
 
     from logdelve.app import LogDelveApp  # noqa: PLC0415
 
@@ -277,5 +278,6 @@ def inspect(  # noqa: C901, PLR0912
         file_size=file_size,
         start_time=start,
         end_time=end,
+        keymap=keymap,
     )
     log_app.run(mouse=False)
