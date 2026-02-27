@@ -25,6 +25,25 @@ _CHUNKED_THRESHOLD = 1_000_000  # 1MB
 _TIMESTAMP_MIN = datetime.min.replace(tzinfo=UTC)
 
 
+def _load_and_validate_keymap() -> dict[str, str] | None:
+    """Load config, validate keybindings, return keymap or exit on error."""
+    from logdelve.config import load_config  # noqa: PLC0415
+    from logdelve.keybindings import build_keymap, normalize_keybindings, validate_keybindings  # noqa: PLC0415
+
+    config = load_config()
+    if not config.keybindings:
+        return None
+
+    normalized = normalize_keybindings(config.keybindings)
+    errors = validate_keybindings(normalized)
+    if errors:
+        for error in errors:
+            typer.echo(error, err=True)
+        raise typer.Exit(1)
+
+    return build_keymap(normalized)
+
+
 def _resolve_parser(parser_name: ParserName, file: Path | None) -> LogParser:
     """Resolve the parser to use. Auto-detect if 'auto' and file is given."""
     if parser_name != ParserName.AUTO:
@@ -156,6 +175,8 @@ def _run_multi_file(
 
     _sort_and_renumber(all_lines)
 
+    keymap = _load_and_validate_keymap()  # noqa: F841
+
     from logdelve.app import LogDelveApp  # noqa: PLC0415
 
     log_app = LogDelveApp(
@@ -239,6 +260,8 @@ def inspect(  # noqa: C901, PLR0912
     else:
         typer.echo("Error: provide a file or pipe input")
         raise typer.Exit(1)
+
+    keymap = _load_and_validate_keymap()  # noqa: F841
 
     from logdelve.app import LogDelveApp  # noqa: PLC0415
 
