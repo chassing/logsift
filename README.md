@@ -36,6 +36,7 @@ A terminal UI tool for viewing, filtering, and analyzing log lines. Built for ou
 - **[Live tailing](docs/guide.md#live-tailing)**: Follow growing log files in real-time with pause/resume
 - **[Flexible time parsing](docs/guide.md#time-parsing)**: Natural language dates ("yesterday at 8am", "friday", "2 days ago")
 - **[Themes](docs/guide.md#themes)**: Choose from all built-in Textual themes with persistent preference
+- **[Configurable Keybindings](docs/guide.md#configurable-keybindings)**: Remap any keybinding via `config.toml` with validation, symbol aliases, and dynamic help screen
 - **[AWS CloudWatch](docs/guide.md#aws-cloudwatch)**: Download and list CloudWatch log groups, streams, and events with stream names
 
 📖 **[Full User Guide](docs/guide.md)** — detailed documentation for all features with examples
@@ -185,6 +186,27 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 | `Ctrl+E`  | Export filtered lines    |     | `t`       | Select theme              |
 
 📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
+
+## Configurable Keybindings
+
+Remap any keybinding by adding a `[keybindings]` section to `~/.config/logdelve/config.toml`:
+
+```toml
+[keybindings]
+search_forward = "ctrl+f"
+quit = "Q"
+filter_in = "i"
+```
+
+Overridden bindings replace defaults; unspecified bindings keep their default keys. Both app-level and log-view-level bindings can be overridden from this single flat section.
+
+Common symbol aliases are accepted: `/` for `slash`, `?` for `question_mark`, `!` for `exclamation_mark`, `#` for `hash`, `@` for `at`, `:` for `colon`, `[` / `]` for bracket keys.
+
+**Validation:** Invalid configs (duplicate keys, unknown actions, bad key format) are caught at startup with a clear error message before the TUI launches.
+
+**Print defaults:** Run `logdelve keybindings` to print a valid TOML template with all configurable actions and their default keys.
+
+📖 [Full configuration guide](docs/guide.md#configurable-keybindings) in the User Guide
 
 ## Development
 

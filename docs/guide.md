@@ -26,6 +26,7 @@ Complete documentation for all logdelve features. For a quick overview, see the 
 - [Themes](#themes)
 - [Large Files](#large-files)
 - [Integration Patterns](#integration-patterns)
+- [Configurable Keybindings](#configurable-keybindings)
 - [Troubleshooting](#troubleshooting)
 - [Keyboard Reference](#keyboard-reference)
 
@@ -875,6 +876,100 @@ cat service-a.log service-b.log | logdelve inspect
 logdelve cloudwatch get /aws/ecs/my-service prefix \
   -s "today 6:00" -e "today 12:00" > morning.log
 ```
+
+---
+
+## Configurable Keybindings
+
+Remap any keybinding by adding a `[keybindings]` section to `~/.config/logdelve/config.toml`.
+
+### Setup
+
+Run `logdelve keybindings` to print a TOML template with all configurable actions and their default keys:
+
+```bash
+logdelve keybindings
+```
+
+Output:
+
+```toml
+[keybindings]
+analyze = "a"
+annotate = "A"
+cursor_down = "down"
+cursor_up = "up"
+cycle_component_display = "c"
+cycle_level_filter = "e"
+export = "ctrl+e"
+filter_in = "f"
+filter_out = "F"
+goto_top = "g"
+...
+```
+
+Copy the output into your config file and change only the keys you want to remap. Unspecified bindings keep their default keys.
+
+### Example
+
+```toml
+# ~/.config/logdelve/config.toml
+[keybindings]
+search_forward = "ctrl+f"
+search_backward = "ctrl+b"
+quit = "Q"
+filter_in = "i"
+```
+
+This remaps search to `Ctrl+F` / `Ctrl+B`, quit to `Q`, and filter-in to `i`. All other keys stay at their defaults.
+
+### Key format
+
+Keys use Textual's canonical format:
+
+- Single characters: `f`, `G`, `q`
+- Modifier keys: `ctrl+f`, `ctrl+e`, `shift+a`
+- Named keys: `pageup`, `pagedown`, `home`, `end`, `enter`, `up`, `down`
+- Symbol names: `slash`, `question_mark`, `exclamation_mark`, `hash`, `at`, `colon`, `left_square_bracket`, `right_square_bracket`
+
+Common symbol aliases are accepted for convenience:
+
+| Alias | Canonical name         |
+| ----- | ---------------------- |
+| `/`   | `slash`                |
+| `?`   | `question_mark`        |
+| `!`   | `exclamation_mark`     |
+| `#`   | `hash`                 |
+| `@`   | `at`                   |
+| `:`   | `colon`                |
+| `[`   | `left_square_bracket`  |
+| `]`   | `right_square_bracket` |
+
+### Validation
+
+Invalid configs are caught at startup with a clear error message before the TUI launches. All errors are reported at once so you can fix everything in one pass.
+
+Checked conditions:
+
+- **Unknown action names**: action must exist in the default registry
+- **Invalid key format**: must be a valid Textual key name
+- **Duplicate keys**: two actions cannot map to the same key
+- **Cross-conflicts**: a custom key cannot collide with an unchanged default
+- **Protected keys**: `tab`, `escape`, `ctrl+c`, `ctrl+q` cannot be rebound
+
+Example error output:
+
+```text
+Error: Unknown action 'filtr_in'
+Error: Duplicate key 'f': filter_in, search_forward
+Error: Cannot rebind protected key 'escape' (action: quit)
+```
+
+### Configurable actions
+
+Both app-level and log-view-level bindings can be overridden from a single flat `[keybindings]` section. The help screen (`h`) always displays your actual configured keys, not the defaults.
+
+Run `logdelve keybindings` for the complete list of action names.
 
 ---
 
