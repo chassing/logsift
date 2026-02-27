@@ -204,6 +204,7 @@ class AppConfig(BaseModel):
     """Application configuration persisted to disk."""
 
     theme: str = "textual-dark"
+    keybindings: dict[str, str] = {}
 
 
 class Session(BaseModel):
