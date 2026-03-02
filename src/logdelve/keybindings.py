@@ -204,7 +204,8 @@ def generate_defaults_toml() -> str:
 
     Output starts with ``[keybindings]`` header and lists all
     actions sorted alphabetically with their default keys.
-    Ready to paste into ``~/.config/logdelve/config.toml``.
+    Ready to paste into the logdelve config file
+    (see ``platformdirs.user_config_dir("logdelve")`` for the path).
     """
     lines = ["[keybindings]"]
     for action in sorted(DEFAULT_BINDINGS):

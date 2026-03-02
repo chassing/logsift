@@ -242,9 +242,12 @@ Input (file/pipe/CloudWatch)
 
 ### Config & Sessions
 
-- Config directory: `~/.config/logdelve/` (via `platformdirs.user_config_dir`)
-- App config: `~/.config/logdelve/config.toml` (currently only `theme` field)
-- Session files: `~/.config/logdelve/sessions/<name>.toml` (filter rules persisted as TOML)
+- Config directory (via `platformdirs.user_config_dir`):
+  - Linux: `~/.config/logdelve/`
+  - macOS: `~/Library/Application Support/logdelve/`
+  - Windows: `%APPDATA%/logdelve/`
+- App config: `<config-dir>/config.toml` (currently only `theme` and `keybindings` fields)
+- Session files: `<config-dir>/sessions/<name>.toml` (filter rules persisted as TOML)
 - Sessions are auto-saved on filter changes
 
 ## Release Checklist
@@ -333,9 +336,12 @@ Follow this pattern (see `syslog.py`, `docker.py` for reference):
 
 ### Config & Sessions
 
-- Config directory: `~/.config/logdelve/` (via platformdirs)
-- App config: `~/.config/logdelve/config.toml`
-- Session files: `~/.config/logdelve/sessions/<name>.toml`
+- Config directory (via `platformdirs`):
+  - Linux: `~/.config/logdelve/`
+  - macOS: `~/Library/Application Support/logdelve/`
+  - Windows: `%APPDATA%/logdelve/`
+- App config: `<config-dir>/config.toml`
+- Session files: `<config-dir>/sessions/<name>.toml`
 - Use stdlib `tomllib` for reading TOML, `tomli-w` for writing.
 
 ### Testing

@@ -13,6 +13,7 @@ from textual.worker import get_current_worker
 
 from logdelve.anomaly import AnomalyResult, build_baseline, detect_anomalies
 from logdelve.config import load_config, save_config
+from logdelve.keybindings import get_merged_bindings
 from logdelve.models import (
     ContentType,
     FilterRule,
@@ -123,7 +124,6 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
     ) -> None:
         super().__init__()
         self._keymap = keymap or {}
-        from logdelve.keybindings import get_merged_bindings  # noqa: PLC0415
 
         self._merged_keybindings = get_merged_bindings(keymap)
         self._lines = lines or []

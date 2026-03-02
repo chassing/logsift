@@ -40,7 +40,7 @@ logdelve inspect --session incident-2026-02-18 /tmp/incident.log
 ```
 
 All your filters and bookmarks are restored instantly. Share the session name with your team
-so they can load it too (session files are stored in `~/.config/logdelve/sessions/`).
+so they can load it too (session files are stored in the config directory, e.g. `~/.config/logdelve/sessions/` on Linux or `~/Library/Application Support/logdelve/sessions/` on macOS).
 
 ## Step 4: Export the Evidence
 

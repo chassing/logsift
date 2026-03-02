@@ -118,7 +118,7 @@ Key terms used throughout this guide:
 - **Baseline**: A known-good log file used as a comparison reference. Defines what "normal" looks like so that new or changed patterns can be identified.
 - **Anomaly Score**: A value indicating how unusual a message template is compared to the baseline. `1.0` = completely new template (not in baseline), `0.5` = significant frequency increase (>5x), `0.0` = known/normal.
 - **Filter Rule**: An include or exclude rule applied to log lines. Multiple include rules use OR logic (match any), multiple exclude rules use AND logic (excluded if any match).
-- **Session**: A named, saved set of filter rules, persisted as a TOML file in `~/.config/logdelve/sessions/`.
+- **Session**: A named, saved set of filter rules, persisted as a TOML file in the config directory (Linux: `~/.config/logdelve/sessions/`, macOS: `~/Library/Application Support/logdelve/sessions/`).
 
 ---
 
@@ -684,7 +684,7 @@ When you press `!` to toggle off the anomaly filter, the cursor stays on the sam
 
 Press `s` to open the session manager.
 
-Filter sessions are saved automatically on every filter change. They persist as TOML files in `~/.config/logdelve/sessions/`. Sessions also persist active search patterns and search history alongside filters and bookmarks.
+Filter sessions are saved automatically on every filter change. They persist as TOML files in the config directory (Linux: `~/.config/logdelve/sessions/`, macOS: `~/Library/Application Support/logdelve/sessions/`). Sessions also persist active search patterns and search history alongside filters and bookmarks.
 
 ### Session manager
 
@@ -799,7 +799,7 @@ All times are interpreted as UTC.
 
 Press `t` to open the theme selection dialog. All built-in Textual themes are available.
 
-The selected theme is persisted in `~/.config/logdelve/config.toml` and restored on next launch.
+The selected theme is persisted in the config file (Linux: `~/.config/logdelve/config.toml`, macOS: `~/Library/Application Support/logdelve/config.toml`) and restored on next launch.
 
 ---
 
@@ -852,7 +852,7 @@ logdelve inspect --baseline baseline.log current.log
 
 ### Pre-built sessions for recurring investigations
 
-Create a TOML session file in `~/.config/logdelve/sessions/` for common filter sets, then load on startup:
+Create a TOML session file in the sessions directory (Linux: `~/.config/logdelve/sessions/`, macOS: `~/Library/Application Support/logdelve/sessions/`) for common filter sets, then load on startup:
 
 ```bash
 logdelve inspect --session error-hunting app.log
@@ -881,7 +881,7 @@ logdelve cloudwatch get /aws/ecs/my-service prefix \
 
 ## Configurable Keybindings
 
-Remap any keybinding by adding a `[keybindings]` section to `~/.config/logdelve/config.toml`.
+Remap any keybinding by adding a `[keybindings]` section to your config file (Linux: `~/.config/logdelve/config.toml`, macOS: `~/Library/Application Support/logdelve/config.toml`).
 
 ### Setup
 
@@ -913,7 +913,8 @@ Copy the output into your config file and change only the keys you want to remap
 ### Example
 
 ```toml
-# ~/.config/logdelve/config.toml
+# Linux: ~/.config/logdelve/config.toml
+# macOS: ~/Library/Application Support/logdelve/config.toml
 [keybindings]
 search_forward = "ctrl+f"
 search_backward = "ctrl+b"

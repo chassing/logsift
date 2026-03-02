@@ -189,7 +189,7 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 
 ## Configurable Keybindings
 
-Remap any keybinding by adding a `[keybindings]` section to `~/.config/logdelve/config.toml`:
+Remap any keybinding by adding a `[keybindings]` section to your config file (Linux: `~/.config/logdelve/config.toml`, macOS: `~/Library/Application Support/logdelve/config.toml`):
 
 ```toml
 [keybindings]
