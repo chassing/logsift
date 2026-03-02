@@ -54,7 +54,12 @@ def get_logs(
 ) -> None:
     """Download CloudWatch log events to stdout."""
     client = create_client(
-        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+        region=aws_region,
+        profile=profile,
+        access_key=aws_access_key_id,
+        secret_key=aws_secret_access_key,
+        session_token=aws_session_token,
+        endpoint_url=aws_endpoint_url,
     )
 
     start_time = parse_time(start)
@@ -80,7 +85,12 @@ def groups(
 ) -> None:
     """List CloudWatch log groups."""
     client = create_client(
-        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+        region=aws_region,
+        profile=profile,
+        access_key=aws_access_key_id,
+        secret_key=aws_secret_access_key,
+        session_token=aws_session_token,
+        endpoint_url=aws_endpoint_url,
     )
     for name in list_log_groups(client, prefix=log_group_prefix):
         print(name)  # noqa: T201
@@ -99,7 +109,12 @@ def streams(
 ) -> None:
     """List CloudWatch log streams."""
     client = create_client(
-        aws_access_key_id, aws_secret_access_key, aws_session_token, profile, aws_region, aws_endpoint_url
+        region=aws_region,
+        profile=profile,
+        access_key=aws_access_key_id,
+        secret_key=aws_secret_access_key,
+        session_token=aws_session_token,
+        endpoint_url=aws_endpoint_url,
     )
     for name in list_log_streams(client, log_group, prefix=prefix):
         print(name)  # noqa: T201

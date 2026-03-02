@@ -8,6 +8,8 @@ from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from logdelve.keybindings import get_merged_bindings
+
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
@@ -36,8 +38,6 @@ def _navigation_section(b: dict[str, str]) -> list[str]:
         _line(_k(b, "scroll_bottom"), "Jump to last line"),
         _line(_k(b, "goto_line"), "Go to line number"),
         _line(_k(b, "jump_to_time"), "Jump to timestamp"),
-        _line(_k(b, "prev_bookmark"), "Previous bookmark"),
-        _line(_k(b, "next_bookmark"), "Next bookmark"),
         "",
     ]
 
@@ -195,8 +195,6 @@ class HelpScreen(ModalScreen[None]):
 
     @override
     def compose(self) -> ComposeResult:
-        from logdelve.keybindings import get_merged_bindings  # noqa: PLC0415
-
         resolved = self._key_bindings or get_merged_bindings()
         help_text = _build_help_text(resolved)
         with VerticalScroll():
