@@ -109,7 +109,9 @@ class FilterBar(Widget):
 
         # Bookmarks
         if self._bookmark_count > 0:
-            text.append(f"{s}{k('toggle_bookmark')}/{k('list_bookmarks')} \U0001f4cc {self._bookmark_count}", style="bold")
+            text.append(
+                f"{s}{k('toggle_bookmark')}/{k('list_bookmarks')} \U0001f4cc {self._bookmark_count}", style="bold"
+            )
             text.append(f"{s}{k('annotate')} \u270f", style="dim")
         else:
             text.append(f"{s}{k('toggle_bookmark')}/{k('list_bookmarks')} \U0001f4cc", style="dim")

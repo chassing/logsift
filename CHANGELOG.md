@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-02
+
+### Added
+
+- **Configurable keybindings**: Remap any keybinding via `[keybindings]` section in `config.toml` with validation, symbol aliases, and dynamic help screen
+- **Keybindings CLI command**: `logdelve keybindings` prints a TOML template with all configurable actions and their default keys
+- **Keybinding validation**: Invalid configs (unknown actions, duplicate keys, reserved keys) are caught at startup with clear error messages
+- **Kubernetes container name**: Container name is now included in component detection for Kubernetes logs
+
 ## [0.3.0] - 2026-02-18
 
 ### Added

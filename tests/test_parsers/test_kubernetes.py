@@ -20,7 +20,7 @@ class TestKubernetesParserTryParse:
     def test_pod_container_prefix(self) -> None:
         result = self.parser.try_parse("my-pod container-abc 2024-01-15T10:30:00Z log line")
         assert result is not None
-        assert result.component == "my-pod"
+        assert result.component == "my-pod/container-abc"
         assert result.timestamp is not None
 
     def test_bracket_without_timestamp(self) -> None:
