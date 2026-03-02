@@ -272,6 +272,21 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self.clear_search()
         self._apply_filters()
 
+    def clear_lines(self) -> None:
+        """Clear all log lines while preserving filters and search patterns."""
+        self._all_lines.clear()
+        self._filtered_indices.clear()  # Clear before cursor_line assignment to avoid stale index access
+        self._global_expand = False
+        self._sticky_expand = False
+        self._bookmarks.clear()
+        self._search_matches.clear()
+        self._nav_matches.clear()
+        self._search_current = -1
+        self._search_matches_by_line.clear()
+        self.cursor_line = 0
+        self._apply_filters()
+        self.refresh()
+
     def cursor_orig_index(self) -> int | None:
         """Get the original line index (in _all_lines) of the current cursor."""
         if not self._filtered_indices:

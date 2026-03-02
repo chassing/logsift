@@ -39,6 +39,7 @@ DEFAULT_BINDINGS: dict[str, str] = {
     "quit": "q",
     "toggle_tail_pause": "p",
     "show_help": "h",
+    "clear_lines": "ctrl+l",
     "save_screenshot_svg": "ctrl+s",
     # LogView-level bindings (from log_view.py)
     "cursor_up": "up",

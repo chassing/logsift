@@ -87,6 +87,7 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
         Binding("t", "toggle_theme", "Theme", show=False, id="toggle_theme"),
         Binding("e", "cycle_level_filter", "Level", show=False, id="cycle_level_filter"),
         Binding("exclamation_mark", "toggle_anomalies", "Anomalies", show=False, id="toggle_anomalies"),
+        Binding("ctrl+l", "clear_lines", "Clear", show=False, id="clear_lines"),
         Binding("q", "quit", "Quit", id="quit"),
         Binding("p", "toggle_tail_pause", "Tail pause", show=False, id="toggle_tail_pause"),
         Binding("h", "show_help", "Help", id="show_help"),
@@ -393,6 +394,26 @@ class LogDelveApp(App[None]):  # noqa: PLR0904
             status_bar.set_new_lines(0)
             self._update_status_bar()
             self.notify("Tailing resumed")
+
+    def action_clear_lines(self) -> None:
+        """Clear all loaded log lines while preserving filters and search patterns."""
+        log_view = self.query_one("#log-view", LogView)
+        status_bar = self.query_one("#status-bar", StatusBar)
+
+        # Clear lines (log_view._all_lines is the same object as self._lines)
+        log_view.clear_lines()
+
+        # Clear tail buffer
+        self._tail_buffer.clear()
+        status_bar.set_new_lines(0)
+
+        # Clear anomaly state
+        self._anomaly_result = None
+        log_view.set_anomaly_scores({})
+        log_view.anomaly_filter = False
+
+        self._update_status_bar()
+        self.notify("Lines cleared")
 
     def _update_status_bar(self) -> None:
         log_view = self.query_one("#log-view", LogView)

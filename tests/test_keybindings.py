@@ -262,6 +262,7 @@ def test_registry_has_app_level_actions() -> None:
         "quit",
         "toggle_tail_pause",
         "show_help",
+        "clear_lines",
         "save_screenshot_svg",
     ]
     for action in app_actions:

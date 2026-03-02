@@ -146,6 +146,7 @@ def _remaining_sections(b: dict[str, str]) -> list[str]:
         _line(_k(b, "toggle_theme"), "Select theme"),
         "",
         "[bold]General[/bold]",
+        _line(_k(b, "clear_lines"), "Clear all lines"),
         _line(_k(b, "show_help"), "Show this help"),
         _line(_k(b, "quit"), "Quit"),
     ]
