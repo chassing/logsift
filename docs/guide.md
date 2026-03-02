@@ -1009,11 +1009,12 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 
 | Key    | Action              |
 | ------ | ------------------- |
-| `h`    | Show help screen    |
-| `t`    | Select theme        |
-| `s`    | Session manager     |
-| `q`    | Quit                |
-| Ctrl+S | Save SVG screenshot |
+| `h`      | Show help screen    |
+| `t`      | Select theme        |
+| `s`      | Session manager     |
+| `q`      | Quit                |
+| `Ctrl+S` | Save SVG screenshot |
+| `Ctrl+L` | Clear all lines     |
 
 ### Navigation
 
@@ -1078,5 +1079,6 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 
 | Key | Action         |
 | --- | -------------- |
-| `p` | Pause / resume |
-| `G` | Jump to bottom |
+| `p`      | Pause / resume |
+| `G`      | Jump to bottom |
+| `Ctrl+L` | Clear lines    |

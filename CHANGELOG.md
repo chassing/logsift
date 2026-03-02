@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-03-02
+
+### Added
+
+- **Clear lines**: `Ctrl+L` clears all loaded log lines while preserving filters and search patterns (useful during live tailing)
+
+### Fixed
+
+- Help screen rendering
+- JSON row rendering
+- CloudWatch command error handling
+
 ## [0.4.0] - 2026-03-02
 
 ### Added

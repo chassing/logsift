@@ -184,6 +184,7 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 | `b` / `B` | Bookmark / list           |     | `A`       | Annotate bookmark         |
 | `[` / `]` | Prev / next bookmark      |     | `@`       | Jump to timestamp         |
 | `Ctrl+E`  | Export filtered lines     |     | `t`       | Select theme              |
+| `Ctrl+L`  | Clear all lines           |     |           |                           |
 
 📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
 
