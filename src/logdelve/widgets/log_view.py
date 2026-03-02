@@ -18,7 +18,7 @@ from logdelve.colors import search_current_style, search_match_style
 from logdelve.filters import apply_filters, check_line
 from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchPatternSet, SearchQuery
 from logdelve.search import find_all_pattern_matches
-from logdelve.widgets.log_line import get_line_height, render_json_expanded_row
+from logdelve.widgets.log_line import get_line_height, render_expanded_content_row
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -343,7 +343,8 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         # Update heights for the new visible line
         visible_idx = len(self.lines) - 1
         expanded = self._is_expanded(visible_idx)
-        h = get_line_height(line, expanded=expanded)
+        viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
+        h = get_line_height(line, expanded=expanded, viewport_width=viewport_width)
         self._heights.append(h)
         offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
         self._offsets.append(offset)
@@ -386,8 +387,9 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         # Batch-compute heights and offsets
         max_width = self._max_width
+        viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
         for line in new_visible:
-            h = get_line_height(line, expanded=False)
+            h = get_line_height(line, expanded=False, viewport_width=viewport_width)
             self._heights.append(h)
             offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
             self._offsets.append(offset)
@@ -453,9 +455,10 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self._heights = []
         self._offsets = []
         offset = 0
+        viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
         for i, line in enumerate(visible):
             expanded = self._is_expanded(i)
-            h = get_line_height(line, expanded=expanded)
+            h = get_line_height(line, expanded=expanded, viewport_width=viewport_width)
             # Add extra row for annotation text
             orig_idx = self._filtered_indices[i] if self._filtered_indices else i
             if self._bookmarks.get(orig_idx):
@@ -669,18 +672,33 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 current_match_offsets = (cm[1], cm[2])
                 current_pattern_index = cm[3]
 
-        if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
-            strip = render_json_expanded_row(
-                line, sub_row, lineno_style, timestamp_style, bg_style, show_line_numbers=self._show_line_numbers
+        # Compute orig_idx and anomaly status (used by multiple branches)
+        orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
+        is_anomaly = orig_idx in self._anomaly_scores
+
+        if expanded and sub_row == 0:
+            # Metadata row: prefix only (no content)
+            segments = self._render_line_prefix(
+                line,
+                lineno_style,
+                timestamp_style,
+                bg_style,
+                is_anomaly=is_anomaly,
+                orig_idx=orig_idx,
             )
-        elif expanded and line.content_type == ContentType.TEXT and sub_row == 1:
-            # Expanded text row 1: show the full raw line (with original timestamp/date)
-            segments = [Segment(f"  {line.raw}", timestamp_style + bg_style)]
             strip = Strip(segments)
+        elif expanded and sub_row > 0:
+            # Content row: wrapped content with indent
+            content_style = timestamp_style if line.content_type == ContentType.TEXT else Style()
+            strip = render_expanded_content_row(
+                line,
+                sub_row - 1,
+                content_width,
+                content_style,
+                bg_style,
+            )
         else:
-            # Check anomaly status using original line index
-            orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
-            is_anomaly = orig_idx in self._anomaly_scores
+            # Compact line
             segments = self._render_compact_line(
                 line,
                 lineno_style,
@@ -697,7 +715,6 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             strip = Strip(segments)
 
         # Check if this sub_row is the annotation row (last row of an annotated bookmark)
-        orig_idx = self._filtered_indices[line_index] if self._filtered_indices else line_index
         if self._bookmarks.get(orig_idx):
             line_height = self._heights[line_index] if line_index < len(self._heights) else 1
             if sub_row == line_height - 1:
@@ -705,7 +722,9 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 annotation_style = Style(color="#56b6c2", italic=True)
                 strip = Strip([Segment(annotation_text, annotation_style + bg_style)])
 
-        strip = strip.crop(scroll_x, scroll_x + content_width)
+        # Expanded rows don't scroll horizontally (content is wrapped)
+        crop_x = 0 if expanded else scroll_x
+        strip = strip.crop(crop_x, crop_x + content_width)
         if bg_style != Style():
             fill_style = Style(bgcolor=bg_style.bgcolor)
             strip = strip.extend_cell_length(content_width, fill_style)
@@ -715,22 +734,17 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
 
         return strip
 
-    def _render_compact_line(  # noqa: C901, PLR0912, PLR0915, PLR0914
+    def _render_line_prefix(  # noqa: C901, PLR0912
         self,
         line: LogLine,
         lineno_style: Style,
         timestamp_style: Style,
-        json_style: Style,
-        text_style: Style,
         bg_style: Style,
-        search_matches: list[tuple[int, int, int]] | None = None,
-        current_match: tuple[int, int] | None = None,
         *,
-        current_pattern_index: int = -1,
         is_anomaly: bool = False,
         orig_idx: int = 0,
     ) -> list[Segment]:
-        """Render a single compact log line with optional multi-pattern search highlighting."""
+        """Render the metadata prefix of a log line (everything before content)."""
         segments: list[Segment] = []
 
         # Anomaly marker
@@ -782,6 +796,33 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         if line.timestamp is not None:
             ts_text = self._compact_timestamp(line)
             segments.append(Segment(ts_text, timestamp_style + bg_style))
+
+        return segments
+
+    def _render_compact_line(
+        self,
+        line: LogLine,
+        lineno_style: Style,
+        timestamp_style: Style,
+        json_style: Style,
+        text_style: Style,
+        bg_style: Style,
+        search_matches: list[tuple[int, int, int]] | None = None,
+        current_match: tuple[int, int] | None = None,
+        *,
+        current_pattern_index: int = -1,
+        is_anomaly: bool = False,
+        orig_idx: int = 0,
+    ) -> list[Segment]:
+        """Render a single compact log line with optional multi-pattern search highlighting."""
+        segments = self._render_line_prefix(
+            line,
+            lineno_style,
+            timestamp_style,
+            bg_style,
+            is_anomaly=is_anomaly,
+            orig_idx=orig_idx,
+        )
 
         content_style = json_style if line.content_type == ContentType.JSON else text_style
 
@@ -888,6 +929,12 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         if level is None:
             return False
         return level_order.index(level) >= min_idx
+
+    def on_resize(self) -> None:
+        """Recompute heights when viewport size changes (affects wrapping)."""
+        if self._global_expand or self._sticky_expand:
+            self._recompute_heights()
+        self.refresh()
 
     def watch_cursor_line(self, _old_value: int, _new_value: int) -> None:
         self._recompute_heights()

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2026-03-02
+
+### Changed
+
+- **Expanded line layout**: Content now renders below the metadata row (line number, level, component, timestamp) instead of next to it, making much more log content visible
+- **Word wrap for expanded lines**: Long lines and JSON values automatically wrap at the viewport edge when expanded, eliminating horizontal scrolling
+- **Smart JSON indent**: Wrapped JSON continuation lines align with the value start position for better readability
+
 ## [0.4.1] - 2026-03-02
 
 ### Added
