@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime  # noqa: TC003 - Pydantic needs this at runtime for model field resolution
 from enum import StrEnum
@@ -41,11 +42,27 @@ class LogLine(BaseModel):
     component: str | None = None
     source_line_number: int | None = None
 
+    _formatted_json_lines: list[str] | None = PrivateAttr(default=None)
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def content(self) -> str:
         """Content portion of the line (raw without timestamp prefix)."""
         return self.raw[self.content_offset :]
+
+    @property
+    def json_lines(self) -> list[str]:
+        """Pretty-printed JSON split into lines (cached)."""
+        if self._formatted_json_lines is None:
+            if self.parsed_json is not None:
+                try:
+                    formatted = json.dumps(self.parsed_json, indent=2, ensure_ascii=False)
+                    self._formatted_json_lines = formatted.split("\n")
+                except (TypeError, ValueError):
+                    self._formatted_json_lines = []
+            else:
+                self._formatted_json_lines = []
+        return self._formatted_json_lines
 
 
 class FilterType(StrEnum):

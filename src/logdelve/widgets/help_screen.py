@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, override
 
+from rich.markup import escape
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
-from logdelve.keybindings import get_merged_bindings
+from logdelve.keybindings import format_key_display, get_merged_bindings
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from rich.highlighter import JSONHighlighter
 from rich.segment import Segment
 from rich.style import Style
@@ -15,69 +13,51 @@ from logdelve.models import ContentType, LogLine
 _json_highlighter = JSONHighlighter()
 
 
-def render_json_expanded(
+def render_json_expanded_row(
     line: LogLine,
-    _width: int,
+    sub_row: int,
     lineno_style: Style,
     timestamp_style: Style,
     bg_style: Style,
     *,
     show_line_numbers: bool = True,
-) -> list[Strip]:
-    """Render a JSON log line as pretty-printed, syntax-highlighted strips."""
-    if line.parsed_json is None:
-        return [
-            _render_compact_strip(
-                line, lineno_style, timestamp_style, Style(), bg_style, show_line_numbers=show_line_numbers
-            )
-        ]
+) -> Strip:
+    """Render a single sub-row of an expanded JSON log line."""
+    json_lines = line.json_lines
+    if not json_lines or sub_row >= len(json_lines):
+        return _render_compact_strip(
+            line, lineno_style, timestamp_style, Style(), bg_style, show_line_numbers=show_line_numbers
+        )
 
-    try:
-        formatted = json.dumps(line.parsed_json, indent=2, ensure_ascii=False)
-    except (TypeError, ValueError):
-        return [
-            _render_compact_strip(
-                line, lineno_style, timestamp_style, Style(), bg_style, show_line_numbers=show_line_numbers
-            )
-        ]
+    segments: list[Segment] = []
 
-    # Compute prefix width for continuation line alignment
-    has_source_lineno = line.source_line_number is not None
-    prefix_width = 0
-    if show_line_numbers:
-        prefix_width += 12 if has_source_lineno else 7
-    if line.timestamp is not None:
-        ts_end = len(line.raw) - len(line.content)
-        prefix_width += ts_end
+    if sub_row == 0:
+        if show_line_numbers:
+            if line.source_line_number is not None:
+                lineno_text = f"{line.line_number}:{line.source_line_number} "
+                lineno_text = f"{lineno_text:>12}"
+            else:
+                lineno_text = f"{line.line_number:>6} "
+            segments.append(Segment(lineno_text, lineno_style + bg_style))
+        if line.timestamp is not None:
+            ts_end = len(line.raw) - len(line.content)
+            ts_text = line.raw[:ts_end]
+            segments.append(Segment(ts_text, timestamp_style + bg_style))
+    else:
+        # Compute prefix width for continuation line alignment
+        prefix_width = 0
+        if show_line_numbers:
+            prefix_width += 12 if line.source_line_number is not None else 7
+        if line.timestamp is not None:
+            ts_end = len(line.raw) - len(line.content)
+            prefix_width += ts_end
+        segments.append(Segment(" " * prefix_width, bg_style))
 
-    json_lines = formatted.split("\n")
-    strips: list[Strip] = []
+    # Apply JSON syntax highlighting, merging bg_style into every segment
+    highlighted = _json_highlighter(Text(json_lines[sub_row]))
+    segments.extend(_text_to_segments(highlighted, bg_style))
 
-    for i, json_line in enumerate(json_lines):
-        segments: list[Segment] = []
-
-        if i == 0:
-            if show_line_numbers:
-                if has_source_lineno:
-                    lineno_text = f"{line.line_number}:{line.source_line_number} "
-                    lineno_text = f"{lineno_text:>12}"
-                else:
-                    lineno_text = f"{line.line_number:>6} "
-                segments.append(Segment(lineno_text, lineno_style + bg_style))
-            if line.timestamp is not None:
-                ts_end = len(line.raw) - len(line.content)
-                ts_text = line.raw[:ts_end]
-                segments.append(Segment(ts_text, timestamp_style + bg_style))
-        else:
-            segments.append(Segment(" " * prefix_width, bg_style))
-
-        # Apply JSON syntax highlighting, merging bg_style into every segment
-        highlighted = _json_highlighter(Text(json_line))
-        segments.extend(_text_to_segments(highlighted, bg_style))
-
-        strips.append(Strip(segments))
-
-    return strips
+    return Strip(segments)
 
 
 def _text_to_segments(text: Text, bg_style: Style) -> list[Segment]:
@@ -136,10 +116,7 @@ def get_line_height(line: LogLine, *, expanded: bool) -> int:
     if not expanded:
         return 1
     if line.content_type == ContentType.JSON and line.parsed_json is not None:
-        try:
-            formatted = json.dumps(line.parsed_json, indent=2, ensure_ascii=False)
-            return formatted.count("\n") + 1
-        except (TypeError, ValueError):
-            return 1
+        lines = line.json_lines
+        return len(lines) if lines else 1
     # Expanded text: compact line + full raw line below
     return 2

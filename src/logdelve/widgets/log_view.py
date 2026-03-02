@@ -18,7 +18,7 @@ from logdelve.colors import search_current_style, search_match_style
 from logdelve.filters import apply_filters, check_line
 from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDirection, SearchPatternSet, SearchQuery
 from logdelve.search import find_all_pattern_matches
-from logdelve.widgets.log_line import get_line_height, render_json_expanded
+from logdelve.widgets.log_line import get_line_height, render_json_expanded_row
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -670,10 +670,9 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
                 current_pattern_index = cm[3]
 
         if expanded and line.content_type == ContentType.JSON and line.parsed_json is not None:
-            strips = render_json_expanded(
-                line, content_width, lineno_style, timestamp_style, bg_style, show_line_numbers=self._show_line_numbers
+            strip = render_json_expanded_row(
+                line, sub_row, lineno_style, timestamp_style, bg_style, show_line_numbers=self._show_line_numbers
             )
-            strip = strips[sub_row] if sub_row < len(strips) else Strip.blank(content_width, self.rich_style)
         elif expanded and line.content_type == ContentType.TEXT and sub_row == 1:
             # Expanded text row 1: show the full raw line (with original timestamp/date)
             segments = [Segment(f"  {line.raw}", timestamp_style + bg_style)]
@@ -925,12 +924,42 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
     # --- Actions ---
 
     def action_cursor_up(self) -> None:
-        if self.cursor_line > 0:
-            self.cursor_line -= 1
+        if not self._offsets:
+            return
+        cursor = self.cursor_line
+        cursor_start = self._offsets[cursor]
+        cursor_height = self._heights[cursor]
+        region_height = self.scrollable_content_region.height
+        scroll_y = self.scroll_offset.y
+
+        # If the current expanded line is taller than the viewport and we
+        # haven't scrolled to its top yet, scroll up within it first.
+        if cursor_height > region_height and scroll_y > cursor_start:
+            self.scroll_to(y=max(cursor_start, scroll_y - region_height), animate=False)
+            self.refresh()
+            return
+
+        if cursor > 0:
+            self.cursor_line = cursor - 1
 
     def action_cursor_down(self) -> None:
-        if self.cursor_line < len(self.lines) - 1:
-            self.cursor_line += 1
+        if not self._offsets:
+            return
+        cursor = self.cursor_line
+        cursor_start = self._offsets[cursor]
+        cursor_height = self._heights[cursor]
+        region_height = self.scrollable_content_region.height
+        scroll_y = self.scroll_offset.y
+
+        # If the current expanded line is taller than the viewport and we
+        # haven't scrolled to its bottom yet, scroll down within it first.
+        if cursor_height > region_height and scroll_y + region_height < cursor_start + cursor_height:
+            self.scroll_to(y=min(cursor_start + cursor_height - region_height, scroll_y + region_height), animate=False)
+            self.refresh()
+            return
+
+        if cursor < len(self.lines) - 1:
+            self.cursor_line = cursor + 1
 
     def action_page_up(self) -> None:
         page_size = max(1, self.scrollable_content_region.height - 1)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from rich.style import Style
 
 from logdelve.models import ContentType, LogLine
-from logdelve.widgets.log_line import get_line_height, render_json_expanded
+from logdelve.widgets.log_line import get_line_height, render_json_expanded_row
 
 
 def _make_json_line(line_number: int = 1, json_str: str = '{"key": "value"}') -> LogLine:
@@ -66,16 +66,18 @@ class TestGetLineHeight:
         assert height >= 5
 
 
-class TestRenderJsonExpanded:
-    def test_returns_multiple_strips(self) -> None:
-        line = _make_json_line(json_str='{"a": 1, "b": 2}')
-        strips = render_json_expanded(line, 80, Style(dim=True), Style(color="cyan"), Style())
-        assert len(strips) > 1
-
-    def test_first_strip_has_line_number(self) -> None:
+class TestRenderJsonExpandedRow:
+    def test_renders_first_row_with_line_number(self) -> None:
         line = _make_json_line(json_str='{"key": "val"}')
-        strips = render_json_expanded(line, 80, Style(dim=True), Style(color="cyan"), Style())
-        assert strips[0].text.lstrip().startswith("1")
+        strip = render_json_expanded_row(line, 0, Style(dim=True), Style(color="cyan"), Style())
+        assert strip.text.lstrip().startswith("1")
+
+    def test_renders_continuation_row(self) -> None:
+        line = _make_json_line(json_str='{"a": 1, "b": 2}')
+        height = get_line_height(line, expanded=True)
+        assert height > 1
+        strip = render_json_expanded_row(line, 1, Style(dim=True), Style(color="cyan"), Style())
+        assert strip.text.strip() != ""
 
     def test_no_parsed_json_returns_compact(self) -> None:
         line = LogLine(
@@ -84,5 +86,5 @@ class TestRenderJsonExpanded:
             content_type=ContentType.JSON,
             parsed_json=None,
         )
-        strips = render_json_expanded(line, 80, Style(dim=True), Style(color="cyan"), Style())
-        assert len(strips) == 1
+        strip = render_json_expanded_row(line, 0, Style(dim=True), Style(color="cyan"), Style())
+        assert strip.text is not None

@@ -148,12 +148,19 @@ class FilterDialog(ModalScreen[FilterRule | list[FilterRule] | None]):
 
             yield Label("Space to toggle, Enter to apply, Escape to cancel", classes="hint")
 
+    _MAX_DISPLAY_VALUE_LEN = 80
+
     def _compose_text_tab(self) -> ComposeResult:
         if self._json_data:
             self._pairs = flatten_json(self._json_data)
             selections: list[tuple[str, str]] = []
             for key, value in self._pairs:
-                selections.append((f"{key} = {value}", f"{key}={value}"))
+                display_value = (
+                    value
+                    if len(value) <= self._MAX_DISPLAY_VALUE_LEN
+                    else value[: self._MAX_DISPLAY_VALUE_LEN] + "\u2026"
+                )
+                selections.append((f"{key} = {display_value}", f"{key}={value}"))
             yield SelectionList[str](*selections, id="json-keys")
 
         yield Input(
