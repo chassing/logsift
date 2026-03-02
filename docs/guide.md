@@ -384,15 +384,15 @@ When you press `/` or `?` again, the dialog is pre-filled with your last search.
 
 Open the search dialog with `/` or `?`. You can maintain up to 10 simultaneous search patterns, each highlighted in a distinct color across the log view.
 
-| Key                     | Action                                               |
-| ----------------------- | ---------------------------------------------------- |
-| Enter (on input)        | Add pattern (or update selected pattern)             |
-| Del                     | Remove selected pattern from list                    |
-| Ctrl+D                  | Clear all patterns                                   |
-| Space (on pattern)      | Toggle whether pattern participates in n/N (●/○)     |
-| > (on pattern)          | Set pattern as the n/N navigation target             |
-| Down arrow (from input) | Move focus into history dropdown                     |
-| Escape                  | Apply current patterns and close dialog              |
+| Key                     | Action                                           |
+| ----------------------- | ------------------------------------------------ |
+| Enter (on input)        | Add pattern (or update selected pattern)         |
+| Del                     | Remove selected pattern from list                |
+| Ctrl+D                  | Clear all patterns                               |
+| Space (on pattern)      | Toggle whether pattern participates in n/N (●/○) |
+| > (on pattern)          | Set pattern as the n/N navigation target         |
+| Down arrow (from input) | Move focus into history dropdown                 |
+| Escape                  | Apply current patterns and close dialog          |
 
 A history dropdown appears below the input when it is empty. Select a previous pattern to restore it with its original options (case-sensitive, regex). History is session-scoped — it does not persist across app restarts.
 
@@ -441,13 +441,13 @@ The navigation dialog (`/`, `?`, `:`, `@`) is a tabbed interface — you can swi
 
 Mark interesting lines during investigation and attach notes.
 
-| Key | Action                                             |
-| --- | -------------------------------------------------- |
-| `b` | Toggle bookmark on current line                    |
-| `B` | List all bookmarks (navigation dialog)             |
-| `A` | Add/edit annotation on current line                |
-| `[` | Jump to previous bookmark                          |
-| `]` | Jump to next bookmark                              |
+| Key | Action                                 |
+| --- | -------------------------------------- |
+| `b` | Toggle bookmark on current line        |
+| `B` | List all bookmarks (navigation dialog) |
+| `A` | Add/edit annotation on current line    |
+| `[` | Jump to previous bookmark              |
+| `]` | Jump to next bookmark                  |
 
 Bookmarked lines show a yellow `*` marker in the gutter. Lines with annotations show `#` instead and display the annotation text inline below the line.
 
@@ -1038,13 +1038,13 @@ The anomaly filter requires `--baseline`. Without a baseline file, there are no 
 
 ### Bookmarks
 
-| Key     | Action                    |
-| ------- | ------------------------- |
-| `b`     | Toggle bookmark           |
-| `B`     | List bookmarks            |
-| `A`     | Add/edit annotation       |
-| `[`     | Previous bookmark         |
-| `]`     | Next bookmark             |
+| Key | Action              |
+| --- | ------------------- |
+| `b` | Toggle bookmark     |
+| `B` | List bookmarks      |
+| `A` | Add/edit annotation |
+| `[` | Previous bookmark   |
+| `]` | Next bookmark       |
 
 ### Search
 

@@ -170,20 +170,20 @@ kubectl logs -l app=my-service --prefix --since=30m | logdelve inspect
 
 ## Keybindings
 
-| Key       | Action                   |     | Key       | Action                    |
-| --------- | ------------------------ | --- | --------- | ------------------------- |
-| `f` / `F` | Filter in / out          |     | `/` / `?` | Search forward / backward |
-| `e`       | Cycle level filter       |     | `n` / `N` | Next / previous match     |
+| Key       | Action                    |     | Key       | Action                    |
+| --------- | ------------------------- | --- | --------- | ------------------------- |
+| `f` / `F` | Filter in / out           |     | `/` / `?` | Search forward / backward |
+| `e`       | Cycle level filter        |     | `n` / `N` | Next / previous match     |
 | `Ctrl+D`  | Clear all search patterns |     |           |                           |
-| `!`       | Toggle anomaly filter    |     | `j`       | Toggle JSON pretty-print  |
-| `x`       | Suspend / resume filters |     | `c`       | Cycle component display   |
-| `m`       | Manage filters           |     | `a`       | Analyze messages          |
-| `1`-`9`   | Toggle individual filter |     | `s`       | Session manager           |
-| `p`       | Pause / resume tailing   |     | `h`       | Help screen               |
-| `r`       | Show related (trace ID)  |     | `:`       | Go to line number         |
-| `b` / `B` | Bookmark / list          |     | `A`       | Annotate bookmark         |
-| `[` / `]` | Prev / next bookmark     |     | `@`       | Jump to timestamp         |
-| `Ctrl+E`  | Export filtered lines    |     | `t`       | Select theme              |
+| `!`       | Toggle anomaly filter     |     | `j`       | Toggle JSON pretty-print  |
+| `x`       | Suspend / resume filters  |     | `c`       | Cycle component display   |
+| `m`       | Manage filters            |     | `a`       | Analyze messages          |
+| `1`-`9`   | Toggle individual filter  |     | `s`       | Session manager           |
+| `p`       | Pause / resume tailing    |     | `h`       | Help screen               |
+| `r`       | Show related (trace ID)   |     | `:`       | Go to line number         |
+| `b` / `B` | Bookmark / list           |     | `A`       | Annotate bookmark         |
+| `[` / `]` | Prev / next bookmark      |     | `@`       | Jump to timestamp         |
+| `Ctrl+E`  | Export filtered lines     |     | `t`       | Select theme              |
 
 📖 [Full keyboard reference](docs/guide.md#keyboard-reference) in the User Guide
 
