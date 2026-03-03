@@ -245,7 +245,7 @@ When creating a new release, **all** of the following steps must be completed:
 6. **Run all checks**: `make test` (lint, format, typecheck, tests)
 7. **Commit**: `git commit -m "Release vX.Y.Z"`
 8. **Push**: `git push`
-9. **Create release**: `gh release create vX.Y.Z --title "vX.Y.Z" --notes "See CHANGELOG.md"`
+9. **Create release**: `gh release create vX.Y.Z --title "vX.Y.Z"` with the CHANGELOG.md section for this version as `--notes` body (not "See CHANGELOG.md")
 
 The `publish.yml` GitHub Action automatically builds and publishes to PyPI on release.
 
