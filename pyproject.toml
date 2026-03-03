@@ -1,6 +1,6 @@
 [project]
 name = "logdelve"
-version = "0.4.2"
+version = "0.4.3"
 description = "A CLI/TUI tool for viewing and filtering log lines"
 readme = "README.md"
 license = "MIT"

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.3] - 2026-03-03
+
+### Fixed
+
+- **Chronological sorting**: Log lines are now displayed in timestamp order, even when input contains interleaved output from multiple sources (e.g., `kubectl logs | logdelve inspect`)
+- **Streaming sort**: New lines during tailing/piping are inserted at the correct chronological position via `bisect`
+- **Jump-to-timestamp performance**: `jump_to_timestamp` now uses binary search (O(log n)) instead of linear scan
+
 ## [0.4.2] - 2026-03-02
 
 ### Changed

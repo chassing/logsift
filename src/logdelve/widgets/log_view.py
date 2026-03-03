@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import bisect
-from typing import TYPE_CHECKING, Any, ClassVar
+from datetime import UTC, datetime
+from typing import Any, ClassVar
 
 from rich.color import Color
 from rich.segment import Segment
@@ -20,8 +21,7 @@ from logdelve.models import ContentType, FilterRule, LogLevel, LogLine, SearchDi
 from logdelve.search import find_all_pattern_matches
 from logdelve.widgets.log_line import get_line_height, render_expanded_content_row
 
-if TYPE_CHECKING:
-    from datetime import datetime
+_TIMESTAMP_MIN = datetime.min.replace(tzinfo=UTC)
 
 # Distinct colors for component tags (work on dark and light backgrounds)
 _COMPONENT_COLORS = [
@@ -324,7 +324,7 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self.refresh()
 
     def append_line(self, line: LogLine) -> None:
-        """Append a single line (for tailing). Auto-scrolls only if cursor was on last line."""
+        """Append a single line (for tailing). Inserts at sorted timestamp position."""
         visible_before = len(self.lines)
         cursor_was_on_last = self.cursor_line >= visible_before - 1
 
@@ -332,35 +332,48 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         self._all_lines.append(line)
 
         # Incremental filter check
-        if self._filter_rules:
-            if check_line(line, self._filter_rules):
-                self._filtered_indices.append(idx)
-            else:
-                return  # Line filtered out, no display update needed
-        else:
-            self._filtered_indices.append(idx)
+        if self._filter_rules and not check_line(line, self._filter_rules):
+            return  # Line filtered out, no display update needed
 
-        # Update heights for the new visible line
-        visible_idx = len(self.lines) - 1
-        expanded = self._is_expanded(visible_idx)
+        # Find sorted insertion position
+        new_key = self._sort_key(idx)
+        pos = bisect.bisect_right(self._filtered_indices, new_key, key=self._sort_key)
+
         viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
-        h = get_line_height(line, expanded=expanded, viewport_width=viewport_width)
-        self._heights.append(h)
-        offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
-        self._offsets.append(offset)
+        h = get_line_height(line, expanded=False, viewport_width=viewport_width)
+
+        if pos >= len(self._filtered_indices):
+            # Common case: new line sorts at end (in-order timestamps)
+            self._filtered_indices.append(idx)
+            self._heights.append(h)
+            offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
+            self._offsets.append(offset)
+        else:
+            # Rare case: out-of-order timestamp, insert in middle
+            self._filtered_indices.insert(pos, idx)
+            self._heights.insert(pos, h)
+            offset = self._offsets[pos] if pos < len(self._offsets) else 0
+            self._offsets.insert(pos, offset)
+            # Fix subsequent offsets
+            for j in range(pos + 1, len(self._offsets)):
+                self._offsets[j] = self._offsets[j - 1] + self._heights[j - 1]
+            # Keep cursor on same line when insertion is before cursor
+            if pos <= self.cursor_line:
+                self.cursor_line += 1
 
         self._max_width = max(self._max_width, len(line.raw))
         total_height = self._offsets[-1] + self._heights[-1] if self._offsets else 0
         self.virtual_size = Size(self._max_width + 10, total_height)
 
-        if cursor_was_on_last:
+        # Auto-scroll only when appended at end and cursor was on last line
+        if cursor_was_on_last and pos >= len(self._filtered_indices) - 1:
             self.cursor_line = len(self.lines) - 1
             self._scroll_cursor_into_view()
 
         self.refresh()
 
     def append_lines(self, lines: list[LogLine]) -> None:
-        """Append a batch of lines (for chunked loading). More efficient than per-line append."""
+        """Append a batch of lines (for chunked loading). Maintains sorted timestamp order."""
         if not lines:
             return
 
@@ -370,34 +383,47 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         base_idx = len(self._all_lines)
         self._all_lines.extend(lines)
 
-        # Incremental filter check for batch
-        new_visible: list[LogLine] = []
+        # Collect new visible indices
+        new_indices: list[int] = []
         for i, line in enumerate(lines):
             idx = base_idx + i
             if self._filter_rules:
                 if check_line(line, self._filter_rules):
-                    self._filtered_indices.append(idx)
-                    new_visible.append(line)
+                    new_indices.append(idx)
             else:
-                self._filtered_indices.append(idx)
-                new_visible.append(line)
+                new_indices.append(idx)
 
-        if not new_visible:
+        if not new_indices:
             return
 
-        # Batch-compute heights and offsets
-        max_width = self._max_width
-        viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
-        for line in new_visible:
-            h = get_line_height(line, expanded=False, viewport_width=viewport_width)
-            self._heights.append(h)
-            offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
-            self._offsets.append(offset)
-            max_width = max(max_width, len(line.raw))
+        # Sort new indices by timestamp
+        new_indices.sort(key=self._sort_key)
 
-        self._max_width = max_width
-        total_height = self._offsets[-1] + self._heights[-1] if self._offsets else 0
-        self.virtual_size = Size(self._max_width + 10, total_height)
+        # Fast path: all new indices sort after existing (common for in-order data)
+        all_after = not self._filtered_indices or self._sort_key(new_indices[0]) >= self._sort_key(
+            self._filtered_indices[-1]
+        )
+
+        if all_after:
+            self._filtered_indices.extend(new_indices)
+            # Batch-compute heights and offsets for appended lines
+            viewport_width = self.scrollable_content_region.width if self.scrollable_content_region else 0
+            max_width = self._max_width
+            for new_idx in new_indices:
+                line = self._all_lines[new_idx]
+                h = get_line_height(line, expanded=False, viewport_width=viewport_width)
+                self._heights.append(h)
+                offset = self._offsets[-1] + self._heights[-2] if len(self._offsets) > 0 else 0
+                self._offsets.append(offset)
+                max_width = max(max_width, len(line.raw))
+            self._max_width = max_width
+            total_height = self._offsets[-1] + self._heights[-1] if self._offsets else 0
+            self.virtual_size = Size(self._max_width + 10, total_height)
+        else:
+            # Slow path: merge new indices into existing sorted list, recompute heights
+            merged = sorted(self._filtered_indices + new_indices, key=self._sort_key)
+            self._filtered_indices = merged
+            self._recompute_heights()
 
         if cursor_was_on_last:
             self.cursor_line = len(self.lines) - 1
@@ -423,6 +449,11 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             self._compute_search_matches()
         self.refresh()
 
+    def _sort_key(self, idx: int) -> tuple[datetime, int]:
+        """Sort key for a line index: (timestamp, original_index)."""
+        ts = self._all_lines[idx].timestamp
+        return (ts if ts is not None else _TIMESTAMP_MIN, idx)
+
     def _apply_filters(self) -> None:
         """Recompute filtered indices and update display."""
         if self._filter_rules:
@@ -441,6 +472,8 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
         # Apply anomaly filter on top
         if self._anomaly_filter and self._anomaly_scores:
             self._filtered_indices = [i for i in self._filtered_indices if i in self._anomaly_scores]
+        # Sort by timestamp for chronological display
+        self._filtered_indices.sort(key=self._sort_key)
         self._recompute_heights()
 
     def _is_expanded(self, line_index: int) -> bool:
@@ -1104,17 +1137,17 @@ class LogView(ScrollView, can_focus=True):  # noqa: PLR0904
             self._scroll_cursor_center()
 
     def jump_to_timestamp(self, target: datetime) -> None:
-        """Jump to the first visible line with timestamp >= target."""
-        visible = self.lines
-        for i, line in enumerate(visible):
-            if line.timestamp is not None and line.timestamp >= target:
-                self.cursor_line = i
-                self._scroll_cursor_center()
-                return
-        # No matching line found → go to last
-        if visible:
-            self.cursor_line = len(visible) - 1
-            self._scroll_cursor_center()
+        """Jump to the first visible line with timestamp >= target (binary search)."""
+        if not self._filtered_indices:
+            return
+        # Binary search: find first index where timestamp >= target
+        target_key = (target, 0)
+        pos = bisect.bisect_left(self._filtered_indices, target_key, key=self._sort_key)
+        if pos < len(self._filtered_indices):
+            self.cursor_line = pos
+        else:
+            self.cursor_line = len(self._filtered_indices) - 1
+        self._scroll_cursor_center()
 
     # --- Bookmarks ---
 

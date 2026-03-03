@@ -111,6 +111,8 @@ def _run_export(
         file_parser = _resolve_parser(parser_name, f)
         all_lines.extend(read_file(f, parser=file_parser))
 
+    _sort_and_renumber(all_lines)
+
     # Apply session filters
     rules: list[FilterRule] = []
     if session_name:
@@ -251,6 +253,7 @@ def inspect(  # noqa: C901, PLR0912
             lines = read_file_initial(file, parser=log_parser)
         else:
             lines = read_file(file, parser=log_parser)
+            _sort_and_renumber(lines)
             file_size = None  # signal: no background loading needed
         source = str(file)
     elif pipe:
